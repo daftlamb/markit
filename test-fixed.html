@@ -90,9 +90,10 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
 }
 
 /* PAPER */
+    <button class="tool-btn" id="btn-random-color">🎲 Random</button>
 .paper{
   position:relative;
-  width:520px;height:735px;
+  width:480px;height:60vh;
   flex-shrink:0;
   background:var(--paper);
   margin:32px 20px;
@@ -153,7 +154,6 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
   border:2px dashed transparent;
   transition:border-color .15s;
   z-index:5;
-  mix-blend-mode:multiply;
 }
 .inserted-img:hover{
   border-color:rgba(192,57,43,.3);
@@ -165,8 +165,6 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
   object-fit:contain;
   pointer-events:none;
 }
-  pointer-events:none;
-}
 </style>
 </head>
 <body>
@@ -174,7 +172,6 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
 <header>
   <div class="brand">Mark<span>It</span> ✦</div>
   <div class="sep"></div>
-  <button class="btn" id="btn-toggle-scroll">⏸ Stop</button>
   <button class="btn" id="btn-clear-marks">Clear marks</button>
   <button class="btn" id="btn-export">↓ PNG</button>
 </header>
@@ -201,25 +198,18 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
     </div>
 
     <div>
-      <div class="ps-t">Apply text</div>
-      <textarea id="txt-input" placeholder="Paste text here..." style="width:100%;height:80px;padding:6px;font-size:13px;font-family:inherit;border:1px solid var(--border);border-radius:3px;resize:vertical"></textarea>
-      <button class="btn" id="btn-apply-text" style="width:100%;margin-top:6px">Apply</button>
-    </div>
-
-    <div>
       <div class="ps-t">Line style</div>
       <div style="display:flex;flex-direction:column;gap:5px">
-        <button class="tool-btn active" data-style="ink">✒ Ink</button>
-        <button class="tool-btn" data-style="brush">🖌 Brush</button>
-        <button class="tool-btn" data-style="pencil">✏ Pencil</button>
-        <button class="tool-btn" data-style="marker">🖍 Marker</button>
+        <button class="style-btn active" data-style="ink">Ink</button>
+        <button class="style-btn" data-style="brush">Brush</button>
+        <button class="style-btn" data-style="pencil">Pencil</button>
+        <button class="style-btn" data-style="marker">Marker</button>
       </div>
     </div>
 
     <div>
       <div class="ps-t">Color</div>
       <div class="color-row" id="color-row"></div>
-      <button class="btn" id="btn-random-color" style="width:100%;margin-top:8px;font-size:13px">🎲 Random</button>
     </div>
 
     <div>
@@ -361,8 +351,6 @@ function buildTextInto(layer, text){
     p.style.fontSize = (sizes[pi % sizes.length]) + 'px';
     if(pi % 3 === 1) p.style.transform = 'rotate(-0.15deg)';
     if(pi % 5 === 3) p.style.transform = 'rotate(0.1deg)';
-    
-    // Smart tokenization: split by spaces, but keep Chinese chars as individual units
     var tokens = para.split(/(\s+)/);
     tokens.forEach(function(tok){
       if(/^\s+$/.test(tok)){
@@ -371,40 +359,15 @@ function buildTextInto(layer, text){
         sp.textContent = tok;
         p.appendChild(sp);
       } else {
-        // Split into Chinese chars + English words + punctuation
         var parts = tok.split(/(?=[,\.;:!?—])|(?<=[,\.;:!?—])/);
         parts.forEach(function(part){
           if(!part) return;
-          // If contains Chinese, split each char
-          if(/[\u4e00-\u9fff]/.test(part)){
-            for(var i=0; i<part.length; i++){
-              var ch = part[i];
-              if(/[\u4e00-\u9fff]/.test(ch)){
-                var sp = document.createElement('span');
-                sp.className = 'word-span';
-                sp.textContent = ch;
-                sp.dataset.word = ch;
-                spans.push(sp);
-                p.appendChild(sp);
-              } else {
-                // Non-Chinese char in mixed string
-                var sp = document.createElement('span');
-                sp.className = 'word-span';
-                sp.textContent = ch;
-                sp.dataset.word = ch.toLowerCase();
-                spans.push(sp);
-                p.appendChild(sp);
-              }
-            }
-          } else {
-            // English word or punctuation
-            var sp = document.createElement('span');
-            sp.className = 'word-span';
-            sp.textContent = part;
-            sp.dataset.word = part.replace(/[^a-zA-Z0-9]/g,'').toLowerCase();
-            spans.push(sp);
-            p.appendChild(sp);
-          }
+          var sp = document.createElement('span');
+          sp.className = 'word-span';
+          sp.textContent = part;
+          sp.dataset.word = part.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,'').toLowerCase();
+          spans.push(sp);
+          p.appendChild(sp);
         });
       }
     });
@@ -434,54 +397,10 @@ function startScroll(){
 
 document.addEventListener('DOMContentLoaded', function(){
   var cw = document.getElementById('canvas-wrap');
-  var scrollStopped = false;
-  var isDragging = false;
-  var dragStartX = 0;
-  var dragStartOffset = 0;
-  
   if(cw){
-    cw.addEventListener('mouseenter', function(){ 
-      if(!scrollStopped) paused = true; 
-    });
-    cw.addEventListener('mouseleave', function(){ 
-      if(!scrollStopped) paused = false; 
-    });
-    
-    // Drag when stopped
-    cw.addEventListener('mousedown', function(e){
-      if(!scrollStopped) return;
-      isDragging = true;
-      dragStartX = e.clientX;
-      var track = document.getElementById('scroll-track');
-      var transform = track.style.transform;
-      var match = transform.match(/translateX\((-?\d+\.?\d*)px\)/);
-      dragStartOffset = match ? parseFloat(match[1]) : 0;
-      cw.style.cursor = 'grabbing';
-      e.preventDefault();
-    });
-    
-    document.addEventListener('mousemove', function(e){
-      if(!isDragging) return;
-      var dx = e.clientX - dragStartX;
-      var track = document.getElementById('scroll-track');
-      track.style.transform = 'translateX(' + (dragStartOffset + dx) + 'px)';
-    });
-    
-    document.addEventListener('mouseup', function(){
-      if(isDragging){
-        isDragging = false;
-        if(scrollStopped) cw.style.cursor = 'grab';
-      }
-    });
+    cw.addEventListener('mouseenter', function(){ paused = true; });
+    cw.addEventListener('mouseleave', function(){ paused = false; });
   }
-  
-  // Toggle scroll button
-  document.getElementById('btn-toggle-scroll').addEventListener('click', function(){
-    scrollStopped = !scrollStopped;
-    paused = scrollStopped;
-    this.textContent = scrollStopped ? '▶ Play' : '⏸ Stop';
-    if(cw) cw.style.cursor = scrollStopped ? 'grab' : 'default';
-  });
 });
 
 function markKeyword(kw){
@@ -577,6 +496,35 @@ function drawInkLine(ctx, pts, color, lw, op){
     var cp2y = p2.y - (p3.y-p1.y)/6 + (Math.random()-.5)*8;
     ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
   }
+  
+  document.getElementById("btn-random-color").addEventListener("click", function(){
+    var allLines = [];
+    papers.forEach(function(paper){
+      if(paper.dataset.lines){
+        var lines = JSON.parse(paper.dataset.lines);
+        lines.forEach(function(line){
+          allLines.push(line);
+        });
+      }
+    });
+    allLines.forEach(function(line){
+      var r = Math.floor(Math.random()*256);
+      var g = Math.floor(Math.random()*256);
+      var b = Math.floor(Math.random()*256);
+      line.color = "rgb("+r+","+g+","+b+")";
+    });
+    papers.forEach(function(paper){
+      var paperLines = [];
+      allLines.forEach(function(line){
+        if(line.paperIndex === parseInt(paper.dataset.index)){
+          paperLines.push(line);
+        }
+      });
+      paper.dataset.lines = JSON.stringify(paperLines);
+    });
+    
+    renderTags();
+  });
   ctx.stroke();
   pts.forEach(function(pt){
     ctx.beginPath();
@@ -673,9 +621,9 @@ function bindEvents(){
       currentTool = btn.dataset.tool;
     });
   });
-  document.querySelectorAll('[data-style]').forEach(function(btn){
+  document.querySelectorAll('.style-btn').forEach(function(btn){
     btn.addEventListener('click',function(){
-      document.querySelectorAll('[data-style]').forEach(function(b){b.classList.remove('active');});
+      document.querySelectorAll('.style-btn').forEach(function(b){b.classList.remove('active');});
       btn.classList.add('active');
       currentStyle = btn.dataset.style;
     });
@@ -733,25 +681,6 @@ function bindEvents(){
     reader.readAsDataURL(file);
     e.target.value = '';
   });
-  
-  // Random color
-  document.getElementById('btn-random-color').addEventListener('click', function(){
-    var randomColor = COLORS[Math.floor(Math.random() * COLORS.length)];
-    currentColor = randomColor;
-    var row = document.getElementById('color-row');
-    row.querySelectorAll('.color-dot').forEach(function(d){
-      d.classList.toggle('active', d.style.background === randomColor);
-    });
-  });
-  
-  // Apply text
-  document.getElementById('btn-apply-text').addEventListener('click', function(){
-    var txt = document.getElementById('txt-input').value.trim();
-    if(!txt) return;
-    PAGE_TEXTS[0] = txt;
-    buildPages();
-    startScroll();
-  });
 }
 
 function hexAlpha(hex, alpha){
@@ -762,16 +691,7 @@ function hexAlpha(hex, alpha){
 
 function insertImageIntoPaper(dataURL){
   var papers = document.querySelectorAll('.paper');
-  // Insert into the middle visible paper
-  var scrollTop = document.getElementById('canvas-wrap').scrollTop;
   var targetPaper = papers[0];
-  for(var i=0; i<papers.length; i++){
-    var rect = papers[i].getBoundingClientRect();
-    if(rect.top < window.innerHeight/2 && rect.bottom > window.innerHeight/2){
-      targetPaper = papers[i];
-      break;
-    }
-  }
   var wrap = document.createElement('div');
   wrap.className = 'inserted-img';
   wrap.style.left = '50px';
@@ -788,9 +708,7 @@ function insertImageIntoPaper(dataURL){
 function makeDraggable(el){
   var isDragging = false;
   var startX, startY, initialLeft, initialTop;
-  
   el.addEventListener('mousedown', function(e){
-    if(e.button !== 0) return; // Only left click
     isDragging = true;
     startX = e.clientX;
     startY = e.clientY;
@@ -799,7 +717,6 @@ function makeDraggable(el){
     el.style.cursor = 'grabbing';
     e.preventDefault();
   });
-  
   document.addEventListener('mousemove', function(e){
     if(!isDragging) return;
     var dx = e.clientX - startX;
@@ -807,25 +724,10 @@ function makeDraggable(el){
     el.style.left = (initialLeft + dx) + 'px';
     el.style.top = (initialTop + dy) + 'px';
   });
-  
   document.addEventListener('mouseup', function(){
     if(isDragging){
       isDragging = false;
       el.style.cursor = 'move';
-    }
-  });
-  
-  // Middle mouse wheel to scale
-  el.addEventListener('wheel', function(e){
-    if(e.button === 1 || e.buttons === 4 || true){ // Always allow wheel scaling
-      e.preventDefault();
-      var currentW = parseInt(el.style.width) || 120;
-      var currentH = parseInt(el.style.height) || 120;
-      var delta = e.deltaY > 0 ? -10 : 10;
-      var newW = Math.max(30, Math.min(500, currentW + delta));
-      var newH = Math.max(30, Math.min(500, currentH + delta));
-      el.style.width = newW + 'px';
-      el.style.height = newH + 'px';
     }
   });
 }

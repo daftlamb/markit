@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Mark It ✦</title>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500&family=IM+Fell+English:ital@0;1&family=Special+Elite&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500&family=IM+Fell+English:ital@0;1&family=Special+Elite&family=Noto+Serif+SC:wght@300;400;600&display=swap" rel="stylesheet"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -25,8 +25,6 @@ header{
   cursor:pointer;color:var(--ink);font-family:inherit;font-size:12px;padding:0 12px;
   transition:border-color .15s,color .15s;letter-spacing:.04em}
 .btn:hover{border-color:var(--ink);color:var(--ink)}
-.btn.danger{border-color:#c0392b;color:#c0392b}
-.btn.danger:hover{background:#c0392b;color:#fff}
 
 /* LAYOUT */
 #layout{display:flex;flex:1;height:calc(100vh - var(--header-h));overflow:hidden}
@@ -91,15 +89,15 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
   position:absolute;top:0;left:0;height:100%;
 }
 
-/* PAPER — 3 pages, shorter height */
+/* PAPER */
+    <button class="tool-btn" id="btn-random-color">🎲 Random</button>
 .paper{
   position:relative;
-  width:480px;
-  height:calc(100vh - var(--header-h) - 120px);
+  width:480px;height:60vh;
   flex-shrink:0;
   background:var(--paper);
-  margin:60px 24px;
-  padding:36px 40px 40px;
+  margin:32px 20px;
+  padding:36px 40px 44px;
   background-image:
     repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(180,160,120,.07) 27px, rgba(180,160,120,.07) 28px);
   overflow:hidden;
@@ -108,7 +106,7 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
 /* TEXT CONTENT */
 .text-layer{
   position:relative;z-index:1;
-  font-family:'IM Fell English',serif;
+  font-family:'IM Fell English','Noto Serif SC',serif;
   line-height:1.65;
   user-select:none;
   height:100%;overflow:hidden;
@@ -122,8 +120,9 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
 
 /* MARK EFFECTS */
 .mark-highlight{
-  position:relative;
-  z-index:2;
+  background:rgba(255,220,50,.45);
+  border-radius:1px;
+  padding:0 1px;
 }
 .mark-redact{
   background:#1a1410;
@@ -134,15 +133,37 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
 .mark-strike{
   position:relative;
 }
-.mark-circle{
-  position:relative;
-  z-index:2;
+.mark-strike::after{
+  content:'';position:absolute;left:-1px;right:-1px;
+  top:50%;height:1.5px;
+  background:#c0392b;
+  transform:rotate(-0.5deg);
+  pointer-events:none;
 }
 
-/* SVG OVERLAY */
-.svg-overlay{
+/* CANVAS OVERLAY */
+.canvas-overlay{
   position:absolute;top:0;left:0;width:100%;height:100%;
-  pointer-events:none;z-index:10;overflow:visible;
+  pointer-events:none;z-index:10;
+}
+
+/* INSERTED IMAGE */
+.inserted-img{
+  position:absolute;
+  cursor:move;
+  border:2px dashed transparent;
+  transition:border-color .15s;
+  z-index:5;
+}
+.inserted-img:hover{
+  border-color:rgba(192,57,43,.3);
+}
+.inserted-img img{
+  display:block;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  pointer-events:none;
 }
 </style>
 </head>
@@ -152,45 +173,42 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
   <div class="brand">Mark<span>It</span> ✦</div>
   <div class="sep"></div>
   <button class="btn" id="btn-clear-marks">Clear marks</button>
-  <button class="btn" id="btn-load-text">Load text</button>
   <button class="btn" id="btn-export">↓ PNG</button>
 </header>
 
 <div id="layout">
+
+  <!-- PANEL -->
   <div id="panel">
+
     <div>
       <div class="ps-t">Mark type</div>
       <div style="display:flex;flex-direction:column;gap:5px">
-        <button class="tool-btn active" data-tool="line">— connect with line</button>
+        <button class="tool-btn active" data-tool="line">— connect</button>
         <button class="tool-btn" data-tool="highlight">◼ highlight</button>
         <button class="tool-btn" data-tool="redact">█ redact</button>
-        <button class="tool-btn" data-tool="strike">⟵ strikethrough</button>
-        <button class="tool-btn" data-tool="circle">○ circle</button>
+        <button class="tool-btn" data-tool="strike">⟵ strike</button>
       </div>
     </div>
 
     <div>
-      <div class="ps-t">Brush style</div>
+      <div class="ps-t">Insert</div>
+      <button class="btn" id="btn-insert-img" style="width:100%">+ Image</button>
+      <input type="file" id="file-input" accept="image/*" style="display:none">
+    </div>
+
+    <div>
+      <div class="ps-t">Line style</div>
       <div style="display:flex;flex-direction:column;gap:5px">
-        <button class="tool-btn" data-brush="ink">✒ Ink</button>
-        <button class="tool-btn active" data-brush="brush">🖌 Brush</button>
-        <button class="tool-btn" data-brush="pencil">✏ Pencil</button>
-        <button class="tool-btn" data-brush="marker">▬ Marker</button>
+        <button class="style-btn active" data-style="ink">Ink</button>
+        <button class="style-btn" data-style="brush">Brush</button>
+        <button class="style-btn" data-style="pencil">Pencil</button>
+        <button class="style-btn" data-style="marker">Marker</button>
       </div>
     </div>
 
     <div>
-      <div class="ps-t">Stroke style</div>
-      <div style="display:flex;flex-direction:column;gap:5px">
-        <button class="tool-btn active" data-style="ink">Ink</button>
-        <button class="tool-btn" data-style="brush">Brush</button>
-        <button class="tool-btn" data-style="pencil">Pencil</button>
-        <button class="tool-btn" data-style="marker">Marker</button>
-      </div>
-    </div>
-
-    <div>
-      <div class="ps-t">Line color</div>
+      <div class="ps-t">Color</div>
       <div class="color-row" id="color-row"></div>
     </div>
 
@@ -212,54 +230,51 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
       <div class="ps-t">Keyword</div>
       <div id="kw-area">
         <input type="text" id="kw-input" placeholder="type a word, press Enter…" autocomplete="off" spellcheck="false"/>
-        <div id="kw-hint">Press <strong>Enter</strong> to mark all matches in the text.</div>
+        <div id="kw-hint">Press <strong>Enter</strong> to mark all matches.</div>
         <div id="kw-tags"></div>
       </div>
     </div>
 
-    <div>
-      <div class="ps-t">Text</div>
-      <textarea id="txt-input" style="width:100%;height:120px;background:var(--bg);color:var(--ink);border:1px solid var(--border);border-radius:4px;padding:8px;font-family:'IM Fell English',serif;font-size:12px;resize:vertical;outline:none;line-height:1.6" placeholder="Paste your text here…"></textarea>
-      <button class="btn" style="margin-top:6px;width:100%" id="btn-apply-text">Apply text</button>
-    </div>
   </div>
 
+  <!-- CANVAS WRAP -->
   <div id="canvas-wrap">
     <div id="scroll-track"></div>
   </div>
+
 </div>
 
 <script>
-// ── Default text chunks — 3 pages ──
+// ── Page texts ──
 var PAGE_TEXTS = [
-  `The relationship between language and thought has occupied philosophers since antiquity. Wittgenstein argued that the limits of one's language are the limits of one's world.
+  `语言与思想的关系自古以来就困扰着哲学家。维特根斯坦认为，一个人语言的界限就是他世界的界限——这一命题颠覆了思想先于表达的普通假设。
 
-Benjamin's concept of aura — that quality of presence, of unrepeatable occurrence — erodes in the age of mechanical reproduction. Yet the copy proliferates meaning even as it evacuates the original.
+本雅明的"灵韵"概念——那种在场的品质，不可重复的发生——在机械复制时代消解了。然而复制品在抽空原作的同时也增殖了意义。
 
-Memory is not storage but reconstruction. Each recollection is a new act, shaped by intervening experience, desire, and the present moment's demands.`,
+记忆不是存储而是重构。每一次回忆都是新的行为，被介入的经验、欲望和当下时刻的要求所塑造。`,
 
-  `The archive speaks only to those who already know what they are looking for. The document does not answer; it waits. History is the art of asking the right question.
+  `档案只对那些已经知道自己在寻找什么的人说话。文献不回答；它等待。历史是提出正确问题的艺术。
 
-Rhizome versus tree. The arboreal structure presupposes a root, a foundation, a hierarchy of branches. The rhizome spreads laterally, without center, without origin.
+根茎对树。树状结构预设了根、基础、枝条的等级。根茎横向蔓延，没有中心，没有起源——多样性而非统一。
 
-In topology, a surface may be transformed continuously without tearing. The coffee cup and the donut are the same. Form is preserved through deformation.`,
+在拓扑学中，一个表面可以连续变形而不撕裂。咖啡杯和甜甜圈是同一个。形式在变形中保存。同一性在扭曲中存续。`,
 
-  `Barthes distinguishes the studium from the punctum: the former a cultural, coded field of interest; the latter a wound, a prick — the accidental detail that pierces the reader.
+  `巴特区分了 studium 和 punctum：前者是文化的、编码的兴趣场域；后者是伤口、刺痛——刺穿图像读者的偶然细节。
 
-Language game, form of life, family resemblance. Ordinary language philosophy insists that meaning is use — not reference, not mental image, but participation in shared practice.
+语言游戏、生活形式、家族相似。日常语言哲学坚持意义即使用——不是指称，不是心理图像，而是参与共享实践。
 
-The symptom speaks where the subject cannot. Repression does not erase but displaces — the return of the repressed in dream, in slip, in symptom.`,
+症状在主体无法言说之处说话。压抑不抹除而是转移——被压抑者在梦、口误、症状中回归。`,
 ];
 
+var PAGE_COUNT = 3;
+var SCROLL_SPEED = 40;
 var currentTool = 'line';
+var currentStyle = 'ink';
 var currentColor = '#c0392b';
 var lineWidth = 1.5;
 var lineOpacity = 0.75;
-var brushMode = 'brush';
 var keywords = [];
 var allWordSpans = [];
-var PAGE_COUNT = 3;
-var SCROLL_SPEED = 25;
 var paused = false;
 
 var COLORS = [
@@ -275,11 +290,26 @@ function init(){
   startScroll();
 }
 
+function buildColorRow(){
+  var row = document.getElementById('color-row');
+  row.innerHTML = '';
+  COLORS.forEach(function(c){
+    var d = document.createElement('div');
+    d.className = 'color-dot' + (c===currentColor?' active':'');
+    d.style.background = c;
+    d.addEventListener('click', function(){
+      currentColor = c;
+      row.querySelectorAll('.color-dot').forEach(function(x){x.classList.remove('active');});
+      d.classList.add('active');
+    });
+    row.appendChild(d);
+  });
+}
+
 function buildPages(){
   var track = document.getElementById('scroll-track');
   track.innerHTML = '';
   allWordSpans = [];
-
   var pages = [];
   for(var i=0;i<PAGE_COUNT;i++) pages.push(i);
   var allPages = pages.concat(pages);
@@ -287,22 +317,26 @@ function buildPages(){
   allPages.forEach(function(idx){
     var paper = document.createElement('div');
     paper.className = 'paper';
-
     var textLayer = document.createElement('div');
     textLayer.className = 'text-layer';
-
-    var svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
-    svg.setAttribute('class','svg-overlay');
-
+    var canvas = document.createElement('canvas');
+    canvas.className = 'canvas-overlay';
     var spans = buildTextInto(textLayer, PAGE_TEXTS[idx]);
     allWordSpans = allWordSpans.concat(spans);
-
     paper.appendChild(textLayer);
-    paper.appendChild(svg);
+    paper.appendChild(canvas);
     track.appendChild(paper);
   });
+  track.style.width = (allPages.length * 560) + 'px';
+  resizeCanvases();
+}
 
-  track.style.width = (allPages.length * 528) + 'px';
+function resizeCanvases(){
+  document.querySelectorAll('.canvas-overlay').forEach(function(c){
+    var p = c.parentElement;
+    c.width = p.offsetWidth;
+    c.height = p.offsetHeight;
+  });
 }
 
 function buildTextInto(layer, text){
@@ -310,7 +344,6 @@ function buildTextInto(layer, text){
   var spans = [];
   var paragraphs = text.split(/\n+/);
   var sizes = [13, 13.5, 12.5, 14, 13, 12];
-
   paragraphs.forEach(function(para, pi){
     if(!para.trim()) return;
     var p = document.createElement('p');
@@ -318,7 +351,6 @@ function buildTextInto(layer, text){
     p.style.fontSize = (sizes[pi % sizes.length]) + 'px';
     if(pi % 3 === 1) p.style.transform = 'rotate(-0.15deg)';
     if(pi % 5 === 3) p.style.transform = 'rotate(0.1deg)';
-
     var tokens = para.split(/(\s+)/);
     tokens.forEach(function(tok){
       if(/^\s+$/.test(tok)){
@@ -346,23 +378,17 @@ function buildTextInto(layer, text){
 
 function startScroll(){
   var track = document.getElementById('scroll-track');
-  var totalW = PAGE_COUNT * 528;
-  var dur = SCROLL_SPEED;
-
-  track.style.animation = 'none';
-  track.style.transform = 'translateX(0)';
-
+  var totalW = PAGE_COUNT * 560;
   var startTime = null;
   var offset = 0;
-
   function tick(ts){
     if(!startTime) startTime = ts;
     if(!paused){
       var elapsed = (ts - startTime) / 1000;
-      offset = (elapsed * (totalW / dur)) % totalW;
+      offset = (elapsed * (totalW / SCROLL_SPEED)) % totalW;
       track.style.transform = 'translateX(-' + offset + 'px)';
     } else {
-      startTime = ts - (offset / (totalW / dur)) * 1000;
+      startTime = ts - (offset / (totalW / SCROLL_SPEED)) * 1000;
     }
     requestAnimationFrame(tick);
   }
@@ -377,152 +403,26 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 });
 
-// ── Brush helpers: hand-drawn quality ──
-function brushLine(svg, pts, color, lw, op){
-  if(pts.length < 2) return;
-  
-  // draw 3-5 overlapping strokes for texture
-  var strokes = 3 + Math.floor(Math.random() * 2);
-  for(var s=0; s<strokes; s++){
-    var path = document.createElementNS('http://www.w3.org/2000/svg','path');
-    var d = 'M' + r(pts[0].x) + ',' + r(pts[0].y);
-    
-    for(var i=1; i<pts.length; i++){
-      var prev = pts[i-1];
-      var curr = pts[i];
-      
-      // add wobble
-      var wobbleX = (Math.random() - 0.5) * 2;
-      var wobbleY = (Math.random() - 0.5) * 2;
-      
-      var cp1x = prev.x + (curr.x - prev.x) * 0.3 + wobbleX;
-      var cp1y = prev.y + (curr.y - prev.y) * 0.3 + wobbleY;
-      var cp2x = prev.x + (curr.x - prev.x) * 0.7 + wobbleX;
-      var cp2y = prev.y + (curr.y - prev.y) * 0.7 + wobbleY;
-      
-      d += ' C' + r(cp1x) + ',' + r(cp1y) + ' ' + r(cp2x) + ',' + r(cp2y) + ' ' + r(curr.x + wobbleX) + ',' + r(curr.y + wobbleY);
-    }
-    
-    path.setAttribute('d', d);
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', color);
-    path.setAttribute('stroke-width', lw * (0.7 + Math.random() * 0.6));
-    path.setAttribute('stroke-opacity', op * (0.3 + s * 0.2));
-    path.setAttribute('stroke-linecap', 'round');
-    path.setAttribute('stroke-linejoin', 'round');
-    svg.appendChild(path);
-  }
-  
-  // dots at each point
-  pts.forEach(function(pt){
-    for(var d=0; d<3; d++){
-      var dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
-      dot.setAttribute('cx', pt.x + (Math.random() - 0.5) * 1.5);
-      dot.setAttribute('cy', pt.y + (Math.random() - 0.5) * 1.5);
-      dot.setAttribute('r', lw * (1.5 + Math.random() * 0.8));
-      dot.setAttribute('fill', color);
-      dot.setAttribute('fill-opacity', op * (0.2 + d * 0.15));
-      svg.appendChild(dot);
-    }
-  });
-  
-  animateStroke(svg.lastChild);
-}
-
-function brushCircle(svg, cx, cy, rx, ry, color){
-  var strokes = 2 + Math.floor(Math.random() * 2);
-  
-  for(var s=0; s<strokes; s++){
-    var el = document.createElementNS('http://www.w3.org/2000/svg','ellipse');
-    var wobbleX = (Math.random() - 0.5) * 3;
-    var wobbleY = (Math.random() - 0.5) * 3;
-    var wobbleRx = (Math.random() - 0.5) * 2;
-    var wobbleRy = (Math.random() - 0.5) * 2;
-    
-    el.setAttribute('cx', cx + wobbleX);
-    el.setAttribute('cy', cy + wobbleY);
-    el.setAttribute('rx', rx + wobbleRx);
-    el.setAttribute('ry', ry + wobbleRy);
-    el.setAttribute('fill', 'none');
-    el.setAttribute('stroke', color);
-    el.setAttribute('stroke-width', 1.2 + Math.random() * 0.6);
-    el.setAttribute('stroke-opacity', 0.4 + s * 0.2);
-    el.setAttribute('transform', 'rotate(' + (Math.random() * 8 - 4) + ',' + cx + ',' + cy + ')');
-    svg.appendChild(el);
-  }
-}
-
-function brushHighlight(sp, color){
-  // multi-layer watercolor wash
-  var layers = 3;
-  for(var i=0; i<layers; i++){
-    var layer = document.createElement('span');
-    layer.style.position = 'absolute';
-    layer.style.left = '-2px';
-    layer.style.right = '-2px';
-    layer.style.top = '-1px';
-    layer.style.bottom = '-1px';
-    layer.style.background = hexAlpha(color, 0.15 + i * 0.08);
-    layer.style.borderRadius = (2 + i) + 'px';
-    layer.style.filter = 'blur(' + (i * 0.5) + 'px)';
-    layer.style.zIndex = '-1';
-    sp.style.position = 'relative';
-    sp.insertBefore(layer, sp.firstChild);
-  }
-}
-
-function brushStrike(sp, color){
-  // double strike with offset
-  var strikes = 2;
-  for(var i=0; i<strikes; i++){
-    var line = document.createElement('span');
-    line.style.position = 'absolute';
-    line.style.left = '-2px';
-    line.style.right = '-2px';
-    line.style.top = '50%';
-    line.style.height = '1.5px';
-    line.style.background = color;
-    line.style.transform = 'translateY(-50%) rotate(' + ((Math.random() - 0.5) * 2) + 'deg)';
-    line.style.opacity = 0.6 + i * 0.2;
-    line.style.pointerEvents = 'none';
-    sp.style.position = 'relative';
-    sp.appendChild(line);
-  }
-}
-
-function animateStroke(el){
-  if(!el || el.tagName !== 'circle') return;
-  el.style.opacity = '0';
-  el.style.transition = 'opacity 0.4s ease-out';
-  requestAnimationFrame(function(){
-    requestAnimationFrame(function(){
-      el.style.opacity = el.getAttribute('fill-opacity') || '1';
-    });
-  });
-}
-
 function markKeyword(kw){
   var tool = currentTool;
+  var style = currentStyle;
   var color = currentColor;
   var lw = lineWidth;
   var op = lineOpacity;
   var word = kw.toLowerCase().trim();
   if(!word) return;
-
   var matched = allWordSpans.filter(function(sp){
     var w = sp.dataset.word;
     return w === word || (word.length > 3 && w.includes(word)) || (w.length > 3 && word.includes(w));
   });
   if(!matched.length) return;
-
   if(tool === 'line'){
     groupByPaper(matched).forEach(function(group){
-      if(group.length >= 2) applyLineConnections(group, color, lw, op);
+      if(group.length >= 2) drawLineConnections(group, color, lw, op, style);
     });
   } else {
     matched.forEach(function(sp){ applyMarkToSpan(sp, tool, color); });
   }
-
   keywords.push({word:kw, color:color, tool:tool});
   renderTags();
 }
@@ -539,53 +439,132 @@ function groupByPaper(spans){
 }
 
 function applyMarkToSpan(sp, tool, color){
-  sp.classList.remove('mark-highlight','mark-redact','mark-strike','mark-circle');
+  sp.classList.remove('mark-highlight','mark-redact','mark-strike');
   if(tool === 'highlight'){
     sp.classList.add('mark-highlight');
-    brushHighlight(sp, color);
+    sp.style.background = hexAlpha(color, 0.4);
   } else if(tool === 'redact'){
     sp.classList.add('mark-redact');
   } else if(tool === 'strike'){
     sp.classList.add('mark-strike');
-    brushStrike(sp, color);
-  } else if(tool === 'circle'){
-    sp.classList.add('mark-circle');
-    drawCircleAroundSpan(sp, color);
+    sp.style.textDecoration = 'line-through';
+    sp.style.textDecorationColor = color;
+    sp.style.textDecorationThickness = '1.5px';
   }
 }
 
-function applyLineConnections(spans, color, lw, op){
+function drawLineConnections(spans, color, lw, op, style){
   if(spans.length < 2) return;
   var paper = spans[0].closest('.paper');
-  var svg = paper.querySelector('.svg-overlay');
+  var canvas = paper.querySelector('.canvas-overlay');
+  var ctx = canvas.getContext('2d');
   var paperRect = paper.getBoundingClientRect();
-
   var pts = spans.map(function(sp){
     var r = sp.getBoundingClientRect();
     return {
       x: r.left - paperRect.left + r.width/2,
-      y: r.top - paperRect.top + r.height/2,
-      sp: sp
+      y: r.top - paperRect.top + r.height/2
     };
   });
-
   spans.forEach(function(sp){
-    brushHighlight(sp, color);
+    sp.style.background = hexAlpha(color, 0.15);
+    sp.style.borderRadius = '2px';
+    sp.style.padding = '0 1px';
   });
-
-  brushLine(svg, pts, color, lw, op);
+  if(style === 'ink') drawInkLine(ctx, pts, color, lw, op);
+  else if(style === 'brush') drawBrushLine(ctx, pts, color, lw, op);
+  else if(style === 'pencil') drawPencilLine(ctx, pts, color, lw, op);
+  else if(style === 'marker') drawMarkerLine(ctx, pts, color, lw, op);
 }
 
-function drawCircleAroundSpan(sp, color){
-  var paper = sp.closest('.paper');
-  var svg = paper.querySelector('.svg-overlay');
-  var paperRect = paper.getBoundingClientRect();
-  var r2 = sp.getBoundingClientRect();
-  var cx = r2.left - paperRect.left + r2.width/2;
-  var cy = r2.top - paperRect.top + r2.height/2;
-  var rx = r2.width/2 + 6;
-  var ry = r2.height/2 + 5;
-  brushCircle(svg, cx, cy, rx, ry, color);
+function drawInkLine(ctx, pts, color, lw, op){
+  ctx.globalAlpha = op;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lw;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for(var i=0;i<pts.length-1;i++){
+    var p0 = pts[Math.max(0,i-1)];
+    var p1 = pts[i];
+    var p2 = pts[i+1];
+    var p3 = pts[Math.min(pts.length-1,i+2)];
+    var cp1x = p1.x + (p2.x-p0.x)/6 + (Math.random()-.5)*8;
+    var cp1y = p1.y + (p2.y-p0.y)/6 + (Math.random()-.5)*8;
+    var cp2x = p2.x - (p3.x-p1.x)/6 + (Math.random()-.5)*8;
+    var cp2y = p2.y - (p3.y-p1.y)/6 + (Math.random()-.5)*8;
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+  }
+  ctx.stroke();
+  pts.forEach(function(pt){
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, lw*2, 0, Math.PI*2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+}
+
+function drawBrushLine(ctx, pts, color, lw, op){
+  var layers = 5;
+  for(var l=0;l<layers;l++){
+    ctx.globalAlpha = op / layers;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lw + Math.random()*0.8;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x + (Math.random()-.5)*2, pts[0].y + (Math.random()-.5)*2);
+    for(var i=1;i<pts.length;i++){
+      var p0 = pts[Math.max(0,i-1)];
+      var p1 = pts[i];
+      var jx = (Math.random()-.5)*3;
+      var jy = (Math.random()-.5)*3;
+      var cpx = (p0.x + p1.x)/2 + jx;
+      var cpy = (p0.y + p1.y)/2 + jy;
+      ctx.quadraticCurveTo(p0.x+jx, p0.y+jy, cpx, cpy);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawPencilLine(ctx, pts, color, lw, op){
+  var layers = 8;
+  for(var l=0;l<layers;l++){
+    ctx.globalAlpha = op / (layers*1.5);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lw * 0.6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x + (Math.random()-.5)*1.5, pts[0].y + (Math.random()-.5)*1.5);
+    for(var i=1;i<pts.length;i++){
+      var p0 = pts[Math.max(0,i-1)];
+      var p1 = pts[i];
+      var jx = (Math.random()-.5)*2;
+      var jy = (Math.random()-.5)*2;
+      var cpx = (p0.x + p1.x)/2 + jx;
+      var cpy = (p0.y + p1.y)/2 + jy;
+      ctx.quadraticCurveTo(p0.x+jx, p0.y+jy, cpx, cpy);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawMarkerLine(ctx, pts, color, lw, op){
+  ctx.globalAlpha = op * 0.6;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lw * 3;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for(var i=1;i<pts.length;i++){
+    ctx.lineTo(pts[i].x, pts[i].y);
+  }
+  ctx.stroke();
+  ctx.globalAlpha = 1;
 }
 
 function renderTags(){
@@ -606,22 +585,20 @@ function renderTags(){
 }
 
 function bindEvents(){
-  document.querySelectorAll('[data-tool]').forEach(function(btn){
+  document.querySelectorAll('.tool-btn').forEach(function(btn){
     btn.addEventListener('click',function(){
-      document.querySelectorAll('[data-tool]').forEach(function(b){b.classList.remove('active');});
+      document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.remove('active');});
       btn.classList.add('active');
       currentTool = btn.dataset.tool;
     });
   });
-
-  document.querySelectorAll('[data-brush]').forEach(function(btn){
+  document.querySelectorAll('.style-btn').forEach(function(btn){
     btn.addEventListener('click',function(){
-      document.querySelectorAll('[data-brush]').forEach(function(b){b.classList.remove('active');});
+      document.querySelectorAll('.style-btn').forEach(function(b){b.classList.remove('active');});
       btn.classList.add('active');
-      brushMode = btn.dataset.brush;
+      currentStyle = btn.dataset.style;
     });
   });
-
   var slLw = document.getElementById('sl-lw');
   var vlLw = document.getElementById('vl-lw');
   slLw.addEventListener('input',function(){
@@ -634,7 +611,6 @@ function bindEvents(){
     lineOpacity = parseFloat(slOp.value);
     vlOp.textContent = lineOpacity.toFixed(2);
   });
-
   var kwin = document.getElementById('kw-input');
   kwin.addEventListener('keydown', function(e){
     if(e.key === 'Enter'){
@@ -643,62 +619,87 @@ function bindEvents(){
       if(val){ markKeyword(val); kwin.value = ''; }
     }
   });
-
   document.getElementById('btn-clear-marks').addEventListener('click', function(){
-    document.querySelectorAll('.svg-overlay').forEach(function(svg){
-      while(svg.lastChild) svg.removeChild(svg.lastChild);
+    document.querySelectorAll('.canvas-overlay').forEach(function(c){
+      var ctx = c.getContext('2d');
+      ctx.clearRect(0,0,c.width,c.height);
     });
     allWordSpans.forEach(function(sp){
-      sp.classList.remove('mark-highlight','mark-redact','mark-strike','mark-circle');
+      sp.classList.remove('mark-highlight','mark-redact','mark-strike');
       sp.style.background = '';
-      sp.style.position = '';
-      sp.innerHTML = sp.textContent;
+      sp.style.textDecoration = '';
+      sp.style.padding = '';
+      sp.style.borderRadius = '';
     });
     keywords = [];
     renderTags();
   });
-
-  document.getElementById('btn-load-text').addEventListener('click', function(){
-    var txt = document.getElementById('txt-input').value.trim();
-    if(txt){
-      var chunks = txt.split(/\n{2,}/);
-      PAGE_TEXTS = [];
-      var chunkSize = Math.ceil(chunks.length / PAGE_COUNT);
-      for(var i=0;i<PAGE_COUNT;i++){
-        PAGE_TEXTS.push(chunks.slice(i*chunkSize,(i+1)*chunkSize).join('\n\n') || PAGE_TEXTS[0]);
-      }
-      buildPages();
-    }
-  });
-  document.getElementById('btn-apply-text').addEventListener('click', function(){
-    document.getElementById('btn-load-text').click();
-  });
-
   document.getElementById('btn-export').addEventListener('click', function(){
     alert('Export coming soon!');
   });
+  
+  // Image insert
+  document.getElementById('btn-insert-img').addEventListener('click', function(){
+    document.getElementById('file-input').click();
+  });
+  document.getElementById('file-input').addEventListener('change', function(e){
+    var file = e.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      insertImageIntoPaper(ev.target.result);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  });
 }
 
-function r(n){ return Math.round(n*10)/10; }
 function hexAlpha(hex, alpha){
   var res = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   if(!res) return hex;
   return 'rgba('+parseInt(res[1],16)+','+parseInt(res[2],16)+','+parseInt(res[3],16)+','+alpha+')';
 }
 
-function buildColorRow(){
-  var row = document.getElementById('color-row');
-  row.innerHTML = '';
-  COLORS.forEach(function(c){
-    var d = document.createElement('div');
-    d.className = 'color-dot' + (c===currentColor?' active':'');
-    d.style.background = c;
-    d.addEventListener('click', function(){
-      currentColor = c;
-      row.querySelectorAll('.color-dot').forEach(function(x){x.classList.remove('active');});
-      d.classList.add('active');
-    });
-    row.appendChild(d);
+function insertImageIntoPaper(dataURL){
+  var papers = document.querySelectorAll('.paper');
+  var targetPaper = papers[0];
+  var wrap = document.createElement('div');
+  wrap.className = 'inserted-img';
+  wrap.style.left = '50px';
+  wrap.style.top = '50px';
+  wrap.style.width = '120px';
+  wrap.style.height = '120px';
+  var img = document.createElement('img');
+  img.src = dataURL;
+  wrap.appendChild(img);
+  targetPaper.appendChild(wrap);
+  makeDraggable(wrap);
+}
+
+function makeDraggable(el){
+  var isDragging = false;
+  var startX, startY, initialLeft, initialTop;
+  el.addEventListener('mousedown', function(e){
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    initialLeft = parseInt(el.style.left) || 0;
+    initialTop = parseInt(el.style.top) || 0;
+    el.style.cursor = 'grabbing';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', function(e){
+    if(!isDragging) return;
+    var dx = e.clientX - startX;
+    var dy = e.clientY - startY;
+    el.style.left = (initialLeft + dx) + 'px';
+    el.style.top = (initialTop + dy) + 'px';
+  });
+  document.addEventListener('mouseup', function(){
+    if(isDragging){
+      isDragging = false;
+      el.style.cursor = 'move';
+    }
   });
 }
 
