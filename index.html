@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Mark It ✦</title>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500&family=IM+Fell+English:ital@0;1&family=Special+Elite&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500&family=IM+Fell+English:ital@0;1&family=Special+Elite&family=Noto+Serif+SC:wght@300;400;600&display=swap" rel="stylesheet"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -92,11 +92,11 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
 /* PAPER */
 .paper{
   position:relative;
-  width:520px;height:calc(100vh - var(--header-h) - 64px);
+  width:480px;height:60vh;
   flex-shrink:0;
   background:var(--paper);
   margin:32px 20px;
-  padding:40px 44px 48px;
+  padding:36px 40px 44px;
   background-image:
     repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(180,160,120,.07) 27px, rgba(180,160,120,.07) 28px);
   overflow:hidden;
@@ -105,7 +105,7 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
 /* TEXT CONTENT */
 .text-layer{
   position:relative;z-index:1;
-  font-family:'IM Fell English',serif;
+  font-family:'IM Fell English','Noto Serif SC',serif;
   line-height:1.65;
   user-select:none;
   height:100%;overflow:hidden;
@@ -145,6 +145,25 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
   position:absolute;top:0;left:0;width:100%;height:100%;
   pointer-events:none;z-index:10;
 }
+
+/* INSERTED IMAGE */
+.inserted-img{
+  position:absolute;
+  cursor:move;
+  border:2px dashed transparent;
+  transition:border-color .15s;
+  z-index:5;
+}
+.inserted-img:hover{
+  border-color:rgba(192,57,43,.3);
+}
+.inserted-img img{
+  display:block;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  pointer-events:none;
+}
 </style>
 </head>
 <body>
@@ -169,6 +188,12 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
         <button class="tool-btn" data-tool="redact">█ redact</button>
         <button class="tool-btn" data-tool="strike">⟵ strike</button>
       </div>
+    </div>
+
+    <div>
+      <div class="ps-t">Insert</div>
+      <button class="btn" id="btn-insert-img" style="width:100%">+ Image</button>
+      <input type="file" id="file-input" accept="image/*" style="display:none">
     </div>
 
     <div>
@@ -221,23 +246,23 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
 <script>
 // ── Page texts ──
 var PAGE_TEXTS = [
-  `The relationship between language and thought has occupied philosophers since antiquity. Wittgenstein argued that the limits of one's language are the limits of one's world.
+  `语言与思想的关系自古以来就困扰着哲学家。维特根斯坦认为，一个人语言的界限就是他世界的界限——这一命题颠覆了思想先于表达的普通假设。
 
-Benjamin's concept of aura — that quality of presence, of unrepeatable occurrence — erodes in the age of mechanical reproduction. Yet the copy proliferates meaning even as it evacuates the original.
+本雅明的"灵韵"概念——那种在场的品质，不可重复的发生——在机械复制时代消解了。然而复制品在抽空原作的同时也增殖了意义。
 
-Memory is not storage but reconstruction. Each recollection is a new act, shaped by intervening experience, desire, and the present moment's demands.`,
+记忆不是存储而是重构。每一次回忆都是新的行为，被介入的经验、欲望和当下时刻的要求所塑造。`,
 
-  `The archive speaks only to those who already know what they are looking for. The document does not answer; it waits. History is the art of asking the right question.
+  `档案只对那些已经知道自己在寻找什么的人说话。文献不回答；它等待。历史是提出正确问题的艺术。
 
-Rhizome versus tree. The arboreal structure presupposes a root, a foundation, a hierarchy of branches. The rhizome spreads laterally, without center, without origin.
+根茎对树。树状结构预设了根、基础、枝条的等级。根茎横向蔓延，没有中心，没有起源——多样性而非统一。
 
-In topology, a surface may be transformed continuously without tearing. The coffee cup and the donut are the same. Form is preserved through deformation.`,
+在拓扑学中，一个表面可以连续变形而不撕裂。咖啡杯和甜甜圈是同一个。形式在变形中保存。同一性在扭曲中存续。`,
 
-  `Barthes distinguishes the studium from the punctum: the former a cultural, coded field of interest; the latter a wound, a prick — the accidental detail that pierces the reader.
+  `巴特区分了 studium 和 punctum：前者是文化的、编码的兴趣场域；后者是伤口、刺痛——刺穿图像读者的偶然细节。
 
-Language game, form of life, family resemblance. Ordinary language philosophy insists that meaning is use — not reference, not mental image, but participation in shared practice.
+语言游戏、生活形式、家族相似。日常语言哲学坚持意义即使用——不是指称，不是心理图像，而是参与共享实践。
 
-The symptom speaks where the subject cannot. Repression does not erase but displaces — the return of the repressed in dream, in slip, in symptom.`,
+症状在主体无法言说之处说话。压抑不抹除而是转移——被压抑者在梦、口误、症状中回归。`,
 ];
 
 var PAGE_COUNT = 3;
@@ -460,11 +485,15 @@ function drawInkLine(ctx, pts, color, lw, op){
   ctx.beginPath();
   ctx.moveTo(pts[0].x, pts[0].y);
   for(var i=0;i<pts.length-1;i++){
-    var p1 = pts[i], p2 = pts[i+1];
-    var mx = (p1.x+p2.x)/2 + (Math.random()-.5)*15;
-    var my = (p1.y+p2.y)/2 + (Math.random()-.5)*15;
-    ctx.quadraticCurveTo(p1.x, p1.y, mx, my);
-    ctx.quadraticCurveTo(mx, my, p2.x, p2.y);
+    var p0 = pts[Math.max(0,i-1)];
+    var p1 = pts[i];
+    var p2 = pts[i+1];
+    var p3 = pts[Math.min(pts.length-1,i+2)];
+    var cp1x = p1.x + (p2.x-p0.x)/6 + (Math.random()-.5)*8;
+    var cp1y = p1.y + (p2.y-p0.y)/6 + (Math.random()-.5)*8;
+    var cp2x = p2.x - (p3.x-p1.x)/6 + (Math.random()-.5)*8;
+    var cp2y = p2.y - (p3.y-p1.y)/6 + (Math.random()-.5)*8;
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
   }
   ctx.stroke();
   pts.forEach(function(pt){
@@ -486,9 +515,13 @@ function drawBrushLine(ctx, pts, color, lw, op){
     ctx.beginPath();
     ctx.moveTo(pts[0].x + (Math.random()-.5)*2, pts[0].y + (Math.random()-.5)*2);
     for(var i=1;i<pts.length;i++){
+      var p0 = pts[Math.max(0,i-1)];
+      var p1 = pts[i];
       var jx = (Math.random()-.5)*3;
       var jy = (Math.random()-.5)*3;
-      ctx.lineTo(pts[i].x + jx, pts[i].y + jy);
+      var cpx = (p0.x + p1.x)/2 + jx;
+      var cpy = (p0.y + p1.y)/2 + jy;
+      ctx.quadraticCurveTo(p0.x+jx, p0.y+jy, cpx, cpy);
     }
     ctx.stroke();
   }
@@ -505,9 +538,13 @@ function drawPencilLine(ctx, pts, color, lw, op){
     ctx.beginPath();
     ctx.moveTo(pts[0].x + (Math.random()-.5)*1.5, pts[0].y + (Math.random()-.5)*1.5);
     for(var i=1;i<pts.length;i++){
+      var p0 = pts[Math.max(0,i-1)];
+      var p1 = pts[i];
       var jx = (Math.random()-.5)*2;
       var jy = (Math.random()-.5)*2;
-      ctx.lineTo(pts[i].x + jx, pts[i].y + jy);
+      var cpx = (p0.x + p1.x)/2 + jx;
+      var cpy = (p0.y + p1.y)/2 + jy;
+      ctx.quadraticCurveTo(p0.x+jx, p0.y+jy, cpx, cpy);
     }
     ctx.stroke();
   }
@@ -599,12 +636,70 @@ function bindEvents(){
   document.getElementById('btn-export').addEventListener('click', function(){
     alert('Export coming soon!');
   });
+  
+  // Image insert
+  document.getElementById('btn-insert-img').addEventListener('click', function(){
+    document.getElementById('file-input').click();
+  });
+  document.getElementById('file-input').addEventListener('change', function(e){
+    var file = e.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      insertImageIntoPaper(ev.target.result);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  });
 }
 
 function hexAlpha(hex, alpha){
   var res = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   if(!res) return hex;
   return 'rgba('+parseInt(res[1],16)+','+parseInt(res[2],16)+','+parseInt(res[3],16)+','+alpha+')';
+}
+
+function insertImageIntoPaper(dataURL){
+  var papers = document.querySelectorAll('.paper');
+  var targetPaper = papers[0];
+  var wrap = document.createElement('div');
+  wrap.className = 'inserted-img';
+  wrap.style.left = '50px';
+  wrap.style.top = '50px';
+  wrap.style.width = '120px';
+  wrap.style.height = '120px';
+  var img = document.createElement('img');
+  img.src = dataURL;
+  wrap.appendChild(img);
+  targetPaper.appendChild(wrap);
+  makeDraggable(wrap);
+}
+
+function makeDraggable(el){
+  var isDragging = false;
+  var startX, startY, initialLeft, initialTop;
+  el.addEventListener('mousedown', function(e){
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    initialLeft = parseInt(el.style.left) || 0;
+    initialTop = parseInt(el.style.top) || 0;
+    el.style.cursor = 'grabbing';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', function(e){
+    if(!isDragging) return;
+    var dx = e.clientX - startX;
+    var dy = e.clientY - startY;
+    el.style.left = (initialLeft + dx) + 'px';
+    el.style.top = (initialTop + dy) + 'px';
+  });
+  document.addEventListener('mouseup', function(){
+    if(isDragging){
+      isDragging = false;
+      el.style.cursor = 'move';
+    }
+  });
 }
 
 init();
