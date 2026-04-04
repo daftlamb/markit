@@ -234,12 +234,6 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
       </div>
     </div>
 
-    <div>
-      <div class="ps-t">Custom text</div>
-      <textarea id="txt-input" style="width:100%;height:100px;background:var(--bg);color:var(--ink);border:1px solid var(--border);border-radius:4px;padding:8px;font-family:'Noto Serif SC',serif;font-size:12px;resize:vertical;outline:none;line-height:1.6" placeholder="Paste your text here…"></textarea>
-      <button class="btn" style="margin-top:6px;width:100%" id="btn-apply-text">Apply text</button>
-    </div>
-
   </div>
 
   <!-- CANVAS WRAP -->
@@ -641,19 +635,6 @@ function bindEvents(){
   });
   document.getElementById('btn-export').addEventListener('click', function(){
     alert('Export coming soon!');
-  });
-  
-  document.getElementById('btn-apply-text').addEventListener('click', function(){
-    var txt = document.getElementById('txt-input').value.trim();
-    if(txt){
-      var chunks = txt.split(/\n{2,}/);
-      PAGE_TEXTS = [];
-      var chunkSize = Math.ceil(chunks.length / PAGE_COUNT);
-      for(var i=0;i<PAGE_COUNT;i++){
-        PAGE_TEXTS.push(chunks.slice(i*chunkSize,(i+1)*chunkSize).join('\n\n') || chunks[0]);
-      }
-      buildPages();
-    }
   });
   
   // Image insert
