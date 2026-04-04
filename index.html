@@ -13,6 +13,7 @@
 }
 html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'Outfit',sans-serif;font-size:13px;color:var(--ink)}
 
+/* HEADER */
 header{
   height:var(--header-h);background:var(--paper);border-bottom:1px solid var(--border);
   display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0;z-index:100;position:relative;
@@ -24,11 +25,11 @@ header{
   cursor:pointer;color:var(--ink);font-family:inherit;font-size:12px;padding:0 12px;
   transition:border-color .15s,color .15s;letter-spacing:.04em}
 .btn:hover{border-color:var(--ink);color:var(--ink)}
-.btn.danger{border-color:#c0392b;color:#c0392b}
-.btn.danger:hover{background:#c0392b;color:#fff}
 
+/* LAYOUT */
 #layout{display:flex;flex:1;height:calc(100vh - var(--header-h));overflow:hidden}
 
+/* PANEL */
 #panel{
   width:240px;flex-shrink:0;background:var(--paper);border-right:1px solid var(--border);
   display:flex;flex-direction:column;padding:16px 14px;gap:14px;overflow-y:auto;
@@ -53,6 +54,7 @@ header{
 input[type=range]{flex:1;accent-color:#c0392b;height:3px}
 .val{width:22px;text-align:right;flex-shrink:0;color:var(--muted)}
 
+/* KEYWORD INPUT */
 #kw-area{display:flex;flex-direction:column;gap:0}
 #kw-input{
   width:100%;border:1px solid var(--border);background:var(--bg);
@@ -71,6 +73,7 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
 .kw-tag .rm{font-size:9px;opacity:.5}
 .kw-tag:hover .rm{opacity:1}
 
+/* CANVAS WRAP */
 #canvas-wrap{
   flex:1;overflow:hidden;position:relative;
   background:var(--bg);
@@ -80,24 +83,26 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
   background-size:28px 28px;
 }
 
+/* SCROLL TRACK */
 #scroll-track{
   display:flex;align-items:center;
   position:absolute;top:0;left:0;height:100%;
 }
 
+/* PAPER */
 .paper{
   position:relative;
-  width:480px;
-  height:calc(100vh - var(--header-h) - 120px);
+  width:520px;height:calc(100vh - var(--header-h) - 64px);
   flex-shrink:0;
   background:var(--paper);
-  margin:60px 24px;
-  padding:36px 40px 40px;
+  margin:32px 20px;
+  padding:40px 44px 48px;
   background-image:
     repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(180,160,120,.07) 27px, rgba(180,160,120,.07) 28px);
   overflow:hidden;
 }
 
+/* TEXT CONTENT */
 .text-layer{
   position:relative;z-index:1;
   font-family:'IM Fell English',serif;
@@ -112,14 +117,33 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
 }
 .word-space{display:inline;white-space:pre}
 
-.mark-highlight{position:relative;z-index:2}
-.mark-redact{background:#1a1410;color:transparent;padding:0 2px;border-radius:1px}
-.mark-strike{position:relative}
-.mark-circle{position:relative;z-index:2}
+/* MARK EFFECTS */
+.mark-highlight{
+  background:rgba(255,220,50,.45);
+  border-radius:1px;
+  padding:0 1px;
+}
+.mark-redact{
+  background:#1a1410;
+  color:transparent;
+  padding:0 2px;
+  border-radius:1px;
+}
+.mark-strike{
+  position:relative;
+}
+.mark-strike::after{
+  content:'';position:absolute;left:-1px;right:-1px;
+  top:50%;height:1.5px;
+  background:#c0392b;
+  transform:rotate(-0.5deg);
+  pointer-events:none;
+}
 
-.svg-overlay{
+/* CANVAS OVERLAY */
+.canvas-overlay{
   position:absolute;top:0;left:0;width:100%;height:100%;
-  pointer-events:none;z-index:10;overflow:visible;
+  pointer-events:none;z-index:10;
 }
 </style>
 </head>
@@ -129,35 +153,36 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
   <div class="brand">Mark<span>It</span> ✦</div>
   <div class="sep"></div>
   <button class="btn" id="btn-clear-marks">Clear marks</button>
-  <button class="btn" id="btn-load-text">Load text</button>
   <button class="btn" id="btn-export">↓ PNG</button>
 </header>
 
 <div id="layout">
+
+  <!-- PANEL -->
   <div id="panel">
+
     <div>
       <div class="ps-t">Mark type</div>
       <div style="display:flex;flex-direction:column;gap:5px">
-        <button class="tool-btn active" data-tool="line">— connect with line</button>
+        <button class="tool-btn active" data-tool="line">— connect</button>
         <button class="tool-btn" data-tool="highlight">◼ highlight</button>
         <button class="tool-btn" data-tool="redact">█ redact</button>
-        <button class="tool-btn" data-tool="strike">⟵ strikethrough</button>
-        <button class="tool-btn" data-tool="circle">○ circle</button>
+        <button class="tool-btn" data-tool="strike">⟵ strike</button>
       </div>
     </div>
 
     <div>
-      <div class="ps-t">Stroke style</div>
+      <div class="ps-t">Line style</div>
       <div style="display:flex;flex-direction:column;gap:5px">
-        <button class="tool-btn active" data-style="ink">Ink</button>
-        <button class="tool-btn" data-style="brush">Brush</button>
-        <button class="tool-btn" data-style="pencil">Pencil</button>
-        <button class="tool-btn" data-style="marker">Marker</button>
+        <button class="style-btn active" data-style="ink">Ink</button>
+        <button class="style-btn" data-style="brush">Brush</button>
+        <button class="style-btn" data-style="pencil">Pencil</button>
+        <button class="style-btn" data-style="marker">Marker</button>
       </div>
     </div>
 
     <div>
-      <div class="ps-t">Line color</div>
+      <div class="ps-t">Color</div>
       <div class="color-row" id="color-row"></div>
     </div>
 
@@ -179,25 +204,22 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
       <div class="ps-t">Keyword</div>
       <div id="kw-area">
         <input type="text" id="kw-input" placeholder="type a word, press Enter…" autocomplete="off" spellcheck="false"/>
-        <div id="kw-hint">Press <strong>Enter</strong> to mark all matches in the text.</div>
+        <div id="kw-hint">Press <strong>Enter</strong> to mark all matches.</div>
         <div id="kw-tags"></div>
       </div>
     </div>
 
-    <div>
-      <div class="ps-t">Text</div>
-      <textarea id="txt-input" style="width:100%;height:120px;background:var(--bg);color:var(--ink);border:1px solid var(--border);border-radius:4px;padding:8px;font-family:'IM Fell English',serif;font-size:12px;resize:vertical;outline:none;line-height:1.6" placeholder="Paste your text here…"></textarea>
-      <button class="btn" style="margin-top:6px;width:100%" id="btn-apply-text">Apply text</button>
-    </div>
   </div>
 
+  <!-- CANVAS WRAP -->
   <div id="canvas-wrap">
     <div id="scroll-track"></div>
   </div>
+
 </div>
 
 <script>
-// ── Default text chunks — 3 pages ──
+// ── Page texts ──
 var PAGE_TEXTS = [
   `The relationship between language and thought has occupied philosophers since antiquity. Wittgenstein argued that the limits of one's language are the limits of one's world.
 
@@ -218,15 +240,15 @@ Language game, form of life, family resemblance. Ordinary language philosophy in
 The symptom speaks where the subject cannot. Repression does not erase but displaces — the return of the repressed in dream, in slip, in symptom.`,
 ];
 
+var PAGE_COUNT = 3;
+var SCROLL_SPEED = 40;
 var currentTool = 'line';
+var currentStyle = 'ink';
 var currentColor = '#c0392b';
-var strokeStyle = 'ink';
 var lineWidth = 1.5;
 var lineOpacity = 0.75;
 var keywords = [];
 var allWordSpans = [];
-var PAGE_COUNT = 3;
-var SCROLL_SPEED = 25;
 var paused = false;
 
 var COLORS = [
@@ -242,11 +264,26 @@ function init(){
   startScroll();
 }
 
+function buildColorRow(){
+  var row = document.getElementById('color-row');
+  row.innerHTML = '';
+  COLORS.forEach(function(c){
+    var d = document.createElement('div');
+    d.className = 'color-dot' + (c===currentColor?' active':'');
+    d.style.background = c;
+    d.addEventListener('click', function(){
+      currentColor = c;
+      row.querySelectorAll('.color-dot').forEach(function(x){x.classList.remove('active');});
+      d.classList.add('active');
+    });
+    row.appendChild(d);
+  });
+}
+
 function buildPages(){
   var track = document.getElementById('scroll-track');
   track.innerHTML = '';
   allWordSpans = [];
-
   var pages = [];
   for(var i=0;i<PAGE_COUNT;i++) pages.push(i);
   var allPages = pages.concat(pages);
@@ -254,22 +291,26 @@ function buildPages(){
   allPages.forEach(function(idx){
     var paper = document.createElement('div');
     paper.className = 'paper';
-
     var textLayer = document.createElement('div');
     textLayer.className = 'text-layer';
-
-    var svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
-    svg.setAttribute('class','svg-overlay');
-
+    var canvas = document.createElement('canvas');
+    canvas.className = 'canvas-overlay';
     var spans = buildTextInto(textLayer, PAGE_TEXTS[idx]);
     allWordSpans = allWordSpans.concat(spans);
-
     paper.appendChild(textLayer);
-    paper.appendChild(svg);
+    paper.appendChild(canvas);
     track.appendChild(paper);
   });
+  track.style.width = (allPages.length * 560) + 'px';
+  resizeCanvases();
+}
 
-  track.style.width = (allPages.length * 528) + 'px';
+function resizeCanvases(){
+  document.querySelectorAll('.canvas-overlay').forEach(function(c){
+    var p = c.parentElement;
+    c.width = p.offsetWidth;
+    c.height = p.offsetHeight;
+  });
 }
 
 function buildTextInto(layer, text){
@@ -277,7 +318,6 @@ function buildTextInto(layer, text){
   var spans = [];
   var paragraphs = text.split(/\n+/);
   var sizes = [13, 13.5, 12.5, 14, 13, 12];
-
   paragraphs.forEach(function(para, pi){
     if(!para.trim()) return;
     var p = document.createElement('p');
@@ -285,7 +325,6 @@ function buildTextInto(layer, text){
     p.style.fontSize = (sizes[pi % sizes.length]) + 'px';
     if(pi % 3 === 1) p.style.transform = 'rotate(-0.15deg)';
     if(pi % 5 === 3) p.style.transform = 'rotate(0.1deg)';
-
     var tokens = para.split(/(\s+)/);
     tokens.forEach(function(tok){
       if(/^\s+$/.test(tok)){
@@ -313,23 +352,17 @@ function buildTextInto(layer, text){
 
 function startScroll(){
   var track = document.getElementById('scroll-track');
-  var totalW = PAGE_COUNT * 528;
-  var dur = SCROLL_SPEED;
-
-  track.style.animation = 'none';
-  track.style.transform = 'translateX(0)';
-
+  var totalW = PAGE_COUNT * 560;
   var startTime = null;
   var offset = 0;
-
   function tick(ts){
     if(!startTime) startTime = ts;
     if(!paused){
       var elapsed = (ts - startTime) / 1000;
-      offset = (elapsed * (totalW / dur)) % totalW;
+      offset = (elapsed * (totalW / SCROLL_SPEED)) % totalW;
       track.style.transform = 'translateX(-' + offset + 'px)';
     } else {
-      startTime = ts - (offset / (totalW / dur)) * 1000;
+      startTime = ts - (offset / (totalW / SCROLL_SPEED)) * 1000;
     }
     requestAnimationFrame(tick);
   }
@@ -344,356 +377,27 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 });
 
-// ── Brush styles: Ink, Brush, Pencil, Marker ──
-function brushLine(svg, pts, color, lw, op){
-  if(pts.length < 2) return;
-  
-  if(strokeStyle === 'ink'){
-    // Ink: clean SVG line with subtle filter
-    var path = document.createElementNS('http://www.w3.org/2000/svg','path');
-    var d = 'M' + r(pts[0].x) + ',' + r(pts[0].y);
-    for(var i=1; i<pts.length; i++){
-      d += ' L' + r(pts[i].x) + ',' + r(pts[i].y);
-    }
-    path.setAttribute('d', d);
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', color);
-    path.setAttribute('stroke-width', lw);
-    path.setAttribute('stroke-opacity', op);
-    path.setAttribute('stroke-linecap', 'round');
-    path.setAttribute('stroke-linejoin', 'round');
-    path.setAttribute('filter', 'url(#ink-filter)');
-    svg.appendChild(path);
-    ensureInkFilter(svg);
-  }
-  else if(strokeStyle === 'brush'){
-    // Brush: multiple overlapping strokes with wobble
-    var strokes = 4 + Math.floor(Math.random() * 3);
-    for(var s=0; s<strokes; s++){
-      var path = document.createElementNS('http://www.w3.org/2000/svg','path');
-      var d = 'M' + r(pts[0].x) + ',' + r(pts[0].y);
-      
-      for(var i=1; i<pts.length; i++){
-        var prev = pts[i-1];
-        var curr = pts[i];
-        var wobbleX = (Math.random() - 0.5) * 2.5;
-        var wobbleY = (Math.random() - 0.5) * 2.5;
-        var cp1x = prev.x + (curr.x - prev.x) * 0.3 + wobbleX;
-        var cp1y = prev.y + (curr.y - prev.y) * 0.3 + wobbleY;
-        var cp2x = prev.x + (curr.x - prev.x) * 0.7 + wobbleX;
-        var cp2y = prev.y + (curr.y - prev.y) * 0.7 + wobbleY;
-        d += ' C' + r(cp1x) + ',' + r(cp1y) + ' ' + r(cp2x) + ',' + r(cp2y) + ' ' + r(curr.x + wobbleX) + ',' + r(curr.y + wobbleY);
-      }
-      
-      path.setAttribute('d', d);
-      path.setAttribute('fill', 'none');
-      path.setAttribute('stroke', color);
-      path.setAttribute('stroke-width', lw * (0.6 + Math.random() * 0.8));
-      path.setAttribute('stroke-opacity', op * (0.25 + s * 0.15));
-      path.setAttribute('stroke-linecap', 'round');
-      path.setAttribute('stroke-linejoin', 'round');
-      svg.appendChild(path);
-    }
-    
-    // Add texture dots
-    pts.forEach(function(pt){
-      for(var d=0; d<4; d++){
-        var dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
-        dot.setAttribute('cx', pt.x + (Math.random() - 0.5) * 2);
-        dot.setAttribute('cy', pt.y + (Math.random() - 0.5) * 2);
-        dot.setAttribute('r', lw * (1.2 + Math.random() * 0.6));
-        dot.setAttribute('fill', color);
-        dot.setAttribute('fill-opacity', op * (0.15 + d * 0.1));
-        svg.appendChild(dot);
-      }
-    });
-  }
-  else if(strokeStyle === 'pencil'){
-    // Pencil: thin gray line with noise texture
-    var grayColor = toGrayscale(color);
-    var strokes = 2 + Math.floor(Math.random() * 2);
-    for(var s=0; s<strokes; s++){
-      var path = document.createElementNS('http://www.w3.org/2000/svg','path');
-      var d = 'M' + r(pts[0].x) + ',' + r(pts[0].y);
-      for(var i=1; i<pts.length; i++){
-        var wobbleX = (Math.random() - 0.5) * 1;
-        var wobbleY = (Math.random() - 0.5) * 1;
-        d += ' L' + r(pts[i].x + wobbleX) + ',' + r(pts[i].y + wobbleY);
-      }
-      path.setAttribute('d', d);
-      path.setAttribute('fill', 'none');
-      path.setAttribute('stroke', grayColor);
-      path.setAttribute('stroke-width', lw * 0.7);
-      path.setAttribute('stroke-opacity', op * (0.5 + s * 0.2));
-      path.setAttribute('stroke-linecap', 'round');
-      svg.appendChild(path);
-    }
-    
-    // Add pencil grain
-    for(var i=0; i<pts.length * 3; i++){
-      var idx = Math.floor(Math.random() * pts.length);
-      var pt = pts[idx];
-      var grain = document.createElementNS('http://www.w3.org/2000/svg','circle');
-      grain.setAttribute('cx', pt.x + (Math.random() - 0.5) * 4);
-      grain.setAttribute('cy', pt.y + (Math.random() - 0.5) * 4);
-      grain.setAttribute('r', 0.3 + Math.random() * 0.4);
-      grain.setAttribute('fill', grayColor);
-      grain.setAttribute('fill-opacity', op * 0.3);
-      svg.appendChild(grain);
-    }
-  }
-  else if(strokeStyle === 'marker'){
-    // Marker: thick semi-transparent overlapping strokes
-    var strokes = 3;
-    for(var s=0; s<strokes; s++){
-      var path = document.createElementNS('http://www.w3.org/2000/svg','path');
-      var d = 'M' + r(pts[0].x) + ',' + r(pts[0].y);
-      for(var i=1; i<pts.length; i++){
-        var wobbleX = (Math.random() - 0.5) * 1.5;
-        var wobbleY = (Math.random() - 0.5) * 1.5;
-        d += ' L' + r(pts[i].x + wobbleX) + ',' + r(pts[i].y + wobbleY);
-      }
-      path.setAttribute('d', d);
-      path.setAttribute('fill', 'none');
-      path.setAttribute('stroke', color);
-      path.setAttribute('stroke-width', lw * (2 + s * 0.3));
-      path.setAttribute('stroke-opacity', op * 0.35);
-      path.setAttribute('stroke-linecap', 'round');
-      path.setAttribute('stroke-linejoin', 'round');
-      svg.appendChild(path);
-    }
-  }
-}
-
-function brushCircle(svg, cx, cy, rx, ry, color){
-  if(strokeStyle === 'ink'){
-    var el = document.createElementNS('http://www.w3.org/2000/svg','ellipse');
-    el.setAttribute('cx', cx);
-    el.setAttribute('cy', cy);
-    el.setAttribute('rx', rx);
-    el.setAttribute('ry', ry);
-    el.setAttribute('fill', 'none');
-    el.setAttribute('stroke', color);
-    el.setAttribute('stroke-width', 1.5);
-    el.setAttribute('stroke-opacity', 0.7);
-    el.setAttribute('filter', 'url(#ink-filter)');
-    svg.appendChild(el);
-    ensureInkFilter(svg);
-  }
-  else if(strokeStyle === 'brush'){
-    var strokes = 3 + Math.floor(Math.random() * 2);
-    for(var s=0; s<strokes; s++){
-      var el = document.createElementNS('http://www.w3.org/2000/svg','ellipse');
-      var wobbleX = (Math.random() - 0.5) * 3;
-      var wobbleY = (Math.random() - 0.5) * 3;
-      var wobbleRx = (Math.random() - 0.5) * 2;
-      var wobbleRy = (Math.random() - 0.5) * 2;
-      el.setAttribute('cx', cx + wobbleX);
-      el.setAttribute('cy', cy + wobbleY);
-      el.setAttribute('rx', rx + wobbleRx);
-      el.setAttribute('ry', ry + wobbleRy);
-      el.setAttribute('fill', 'none');
-      el.setAttribute('stroke', color);
-      el.setAttribute('stroke-width', 1.2 + Math.random() * 0.6);
-      el.setAttribute('stroke-opacity', 0.4 + s * 0.15);
-      el.setAttribute('transform', 'rotate(' + (Math.random() * 8 - 4) + ',' + cx + ',' + cy + ')');
-      svg.appendChild(el);
-    }
-  }
-  else if(strokeStyle === 'pencil'){
-    var grayColor = toGrayscale(color);
-    var strokes = 2;
-    for(var s=0; s<strokes; s++){
-      var el = document.createElementNS('http://www.w3.org/2000/svg','ellipse');
-      el.setAttribute('cx', cx + (Math.random() - 0.5) * 1);
-      el.setAttribute('cy', cy + (Math.random() - 0.5) * 1);
-      el.setAttribute('rx', rx);
-      el.setAttribute('ry', ry);
-      el.setAttribute('fill', 'none');
-      el.setAttribute('stroke', grayColor);
-      el.setAttribute('stroke-width', 1);
-      el.setAttribute('stroke-opacity', 0.6);
-      svg.appendChild(el);
-    }
-  }
-  else if(strokeStyle === 'marker'){
-    var strokes = 2;
-    for(var s=0; s<strokes; s++){
-      var el = document.createElementNS('http://www.w3.org/2000/svg','ellipse');
-      el.setAttribute('cx', cx);
-      el.setAttribute('cy', cy);
-      el.setAttribute('rx', rx + s);
-      el.setAttribute('ry', ry + s);
-      el.setAttribute('fill', 'none');
-      el.setAttribute('stroke', color);
-      el.setAttribute('stroke-width', 3);
-      el.setAttribute('stroke-opacity', 0.3);
-      svg.appendChild(el);
-    }
-  }
-}
-
-function brushHighlight(sp, color){
-  if(strokeStyle === 'ink'){
-    sp.style.background = hexAlpha(color, 0.2);
-    sp.style.borderRadius = '2px';
-  }
-  else if(strokeStyle === 'brush'){
-    var layers = 3;
-    for(var i=0; i<layers; i++){
-      var layer = document.createElement('span');
-      layer.style.position = 'absolute';
-      layer.style.left = '-2px';
-      layer.style.right = '-2px';
-      layer.style.top = '-1px';
-      layer.style.bottom = '-1px';
-      layer.style.background = hexAlpha(color, 0.12 + i * 0.06);
-      layer.style.borderRadius = (2 + i) + 'px';
-      layer.style.filter = 'blur(' + (i * 0.5) + 'px)';
-      layer.style.zIndex = '-1';
-      sp.style.position = 'relative';
-      sp.insertBefore(layer, sp.firstChild);
-    }
-  }
-  else if(strokeStyle === 'pencil'){
-    var grayColor = toGrayscale(color);
-    sp.style.background = hexAlpha(grayColor, 0.15);
-    sp.style.borderRadius = '1px';
-  }
-  else if(strokeStyle === 'marker'){
-    var layers = 2;
-    for(var i=0; i<layers; i++){
-      var layer = document.createElement('span');
-      layer.style.position = 'absolute';
-      layer.style.left = '-3px';
-      layer.style.right = '-3px';
-      layer.style.top = '-2px';
-      layer.style.bottom = '-2px';
-      layer.style.background = hexAlpha(color, 0.25);
-      layer.style.borderRadius = '3px';
-      layer.style.zIndex = '-1';
-      sp.style.position = 'relative';
-      sp.insertBefore(layer, sp.firstChild);
-    }
-  }
-}
-
-function brushStrike(sp, color){
-  if(strokeStyle === 'ink'){
-    var line = document.createElement('span');
-    line.style.position = 'absolute';
-    line.style.left = '-2px';
-    line.style.right = '-2px';
-    line.style.top = '50%';
-    line.style.height = '1.5px';
-    line.style.background = color;
-    line.style.transform = 'translateY(-50%)';
-    line.style.opacity = '0.75';
-    line.style.pointerEvents = 'none';
-    sp.style.position = 'relative';
-    sp.appendChild(line);
-  }
-  else if(strokeStyle === 'brush'){
-    var strikes = 2;
-    for(var i=0; i<strikes; i++){
-      var line = document.createElement('span');
-      line.style.position = 'absolute';
-      line.style.left = '-2px';
-      line.style.right = '-2px';
-      line.style.top = '50%';
-      line.style.height = '1.5px';
-      line.style.background = color;
-      line.style.transform = 'translateY(-50%) rotate(' + ((Math.random() - 0.5) * 2) + 'deg)';
-      line.style.opacity = 0.5 + i * 0.2;
-      line.style.pointerEvents = 'none';
-      sp.style.position = 'relative';
-      sp.appendChild(line);
-    }
-  }
-  else if(strokeStyle === 'pencil'){
-    var grayColor = toGrayscale(color);
-    var line = document.createElement('span');
-    line.style.position = 'absolute';
-    line.style.left = '-2px';
-    line.style.right = '-2px';
-    line.style.top = '50%';
-    line.style.height = '1px';
-    line.style.background = grayColor;
-    line.style.transform = 'translateY(-50%)';
-    line.style.opacity = '0.6';
-    line.style.pointerEvents = 'none';
-    sp.style.position = 'relative';
-    sp.appendChild(line);
-  }
-  else if(strokeStyle === 'marker'){
-    var line = document.createElement('span');
-    line.style.position = 'absolute';
-    line.style.left = '-3px';
-    line.style.right = '-3px';
-    line.style.top = '50%';
-    line.style.height = '3px';
-    line.style.background = color;
-    line.style.transform = 'translateY(-50%)';
-    line.style.opacity = '0.5';
-    line.style.pointerEvents = 'none';
-    sp.style.position = 'relative';
-    sp.appendChild(line);
-  }
-}
-
-function ensureInkFilter(svg){
-  if(svg.querySelector('#ink-filter')) return;
-  var defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
-  var filter = document.createElementNS('http://www.w3.org/2000/svg','filter');
-  filter.setAttribute('id','ink-filter');
-  var turb = document.createElementNS('http://www.w3.org/2000/svg','feTurbulence');
-  turb.setAttribute('baseFrequency','0.05');
-  turb.setAttribute('numOctaves','2');
-  turb.setAttribute('result','turbulence');
-  var disp = document.createElementNS('http://www.w3.org/2000/svg','feDisplacementMap');
-  disp.setAttribute('in','SourceGraphic');
-  disp.setAttribute('in2','turbulence');
-  disp.setAttribute('scale','1');
-  filter.appendChild(turb);
-  filter.appendChild(disp);
-  defs.appendChild(filter);
-  svg.appendChild(defs);
-}
-
-function toGrayscale(hex){
-  var res = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if(!res) return '#666';
-  var r = parseInt(res[1],16);
-  var g = parseInt(res[2],16);
-  var b = parseInt(res[3],16);
-  var gray = Math.round(0.299*r + 0.587*g + 0.114*b);
-  var h = gray.toString(16).padStart(2,'0');
-  return '#'+h+h+h;
-}
-
 function markKeyword(kw){
   var tool = currentTool;
+  var style = currentStyle;
   var color = currentColor;
   var lw = lineWidth;
   var op = lineOpacity;
   var word = kw.toLowerCase().trim();
   if(!word) return;
-
   var matched = allWordSpans.filter(function(sp){
     var w = sp.dataset.word;
     return w === word || (word.length > 3 && w.includes(word)) || (w.length > 3 && word.includes(w));
   });
   if(!matched.length) return;
-
   if(tool === 'line'){
     groupByPaper(matched).forEach(function(group){
-      if(group.length >= 2) applyLineConnections(group, color, lw, op);
+      if(group.length >= 2) drawLineConnections(group, color, lw, op, style);
     });
   } else {
     matched.forEach(function(sp){ applyMarkToSpan(sp, tool, color); });
   }
-
-  keywords.push({word:kw, color:color, tool:tool, style:strokeStyle});
+  keywords.push({word:kw, color:color, tool:tool});
   renderTags();
 }
 
@@ -709,53 +413,120 @@ function groupByPaper(spans){
 }
 
 function applyMarkToSpan(sp, tool, color){
-  sp.classList.remove('mark-highlight','mark-redact','mark-strike','mark-circle');
+  sp.classList.remove('mark-highlight','mark-redact','mark-strike');
   if(tool === 'highlight'){
     sp.classList.add('mark-highlight');
-    brushHighlight(sp, color);
+    sp.style.background = hexAlpha(color, 0.4);
   } else if(tool === 'redact'){
     sp.classList.add('mark-redact');
   } else if(tool === 'strike'){
     sp.classList.add('mark-strike');
-    brushStrike(sp, color);
-  } else if(tool === 'circle'){
-    sp.classList.add('mark-circle');
-    drawCircleAroundSpan(sp, color);
+    sp.style.textDecoration = 'line-through';
+    sp.style.textDecorationColor = color;
+    sp.style.textDecorationThickness = '1.5px';
   }
 }
 
-function applyLineConnections(spans, color, lw, op){
+function drawLineConnections(spans, color, lw, op, style){
   if(spans.length < 2) return;
   var paper = spans[0].closest('.paper');
-  var svg = paper.querySelector('.svg-overlay');
+  var canvas = paper.querySelector('.canvas-overlay');
+  var ctx = canvas.getContext('2d');
   var paperRect = paper.getBoundingClientRect();
-
   var pts = spans.map(function(sp){
     var r = sp.getBoundingClientRect();
     return {
       x: r.left - paperRect.left + r.width/2,
-      y: r.top - paperRect.top + r.height/2,
-      sp: sp
+      y: r.top - paperRect.top + r.height/2
     };
   });
-
   spans.forEach(function(sp){
-    brushHighlight(sp, color);
+    sp.style.background = hexAlpha(color, 0.15);
+    sp.style.borderRadius = '2px';
+    sp.style.padding = '0 1px';
   });
-
-  brushLine(svg, pts, color, lw, op);
+  if(style === 'ink') drawInkLine(ctx, pts, color, lw, op);
+  else if(style === 'brush') drawBrushLine(ctx, pts, color, lw, op);
+  else if(style === 'pencil') drawPencilLine(ctx, pts, color, lw, op);
+  else if(style === 'marker') drawMarkerLine(ctx, pts, color, lw, op);
 }
 
-function drawCircleAroundSpan(sp, color){
-  var paper = sp.closest('.paper');
-  var svg = paper.querySelector('.svg-overlay');
-  var paperRect = paper.getBoundingClientRect();
-  var r2 = sp.getBoundingClientRect();
-  var cx = r2.left - paperRect.left + r2.width/2;
-  var cy = r2.top - paperRect.top + r2.height/2;
-  var rx = r2.width/2 + 6;
-  var ry = r2.height/2 + 5;
-  brushCircle(svg, cx, cy, rx, ry, color);
+function drawInkLine(ctx, pts, color, lw, op){
+  ctx.globalAlpha = op;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lw;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for(var i=0;i<pts.length-1;i++){
+    var p1 = pts[i], p2 = pts[i+1];
+    var mx = (p1.x+p2.x)/2 + (Math.random()-.5)*15;
+    var my = (p1.y+p2.y)/2 + (Math.random()-.5)*15;
+    ctx.quadraticCurveTo(p1.x, p1.y, mx, my);
+    ctx.quadraticCurveTo(mx, my, p2.x, p2.y);
+  }
+  ctx.stroke();
+  pts.forEach(function(pt){
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, lw*2, 0, Math.PI*2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+}
+
+function drawBrushLine(ctx, pts, color, lw, op){
+  var layers = 5;
+  for(var l=0;l<layers;l++){
+    ctx.globalAlpha = op / layers;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lw + Math.random()*0.8;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x + (Math.random()-.5)*2, pts[0].y + (Math.random()-.5)*2);
+    for(var i=1;i<pts.length;i++){
+      var jx = (Math.random()-.5)*3;
+      var jy = (Math.random()-.5)*3;
+      ctx.lineTo(pts[i].x + jx, pts[i].y + jy);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawPencilLine(ctx, pts, color, lw, op){
+  var layers = 8;
+  for(var l=0;l<layers;l++){
+    ctx.globalAlpha = op / (layers*1.5);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lw * 0.6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x + (Math.random()-.5)*1.5, pts[0].y + (Math.random()-.5)*1.5);
+    for(var i=1;i<pts.length;i++){
+      var jx = (Math.random()-.5)*2;
+      var jy = (Math.random()-.5)*2;
+      ctx.lineTo(pts[i].x + jx, pts[i].y + jy);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawMarkerLine(ctx, pts, color, lw, op){
+  ctx.globalAlpha = op * 0.6;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lw * 3;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for(var i=1;i<pts.length;i++){
+    ctx.lineTo(pts[i].x, pts[i].y);
+  }
+  ctx.stroke();
+  ctx.globalAlpha = 1;
 }
 
 function renderTags(){
@@ -776,22 +547,20 @@ function renderTags(){
 }
 
 function bindEvents(){
-  document.querySelectorAll('.tool-btn[data-tool]').forEach(function(btn){
+  document.querySelectorAll('.tool-btn').forEach(function(btn){
     btn.addEventListener('click',function(){
-      document.querySelectorAll('.tool-btn[data-tool]').forEach(function(b){b.classList.remove('active');});
+      document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.remove('active');});
       btn.classList.add('active');
       currentTool = btn.dataset.tool;
     });
   });
-
-  document.querySelectorAll('.tool-btn[data-style]').forEach(function(btn){
+  document.querySelectorAll('.style-btn').forEach(function(btn){
     btn.addEventListener('click',function(){
-      document.querySelectorAll('.tool-btn[data-style]').forEach(function(b){b.classList.remove('active');});
+      document.querySelectorAll('.style-btn').forEach(function(b){b.classList.remove('active');});
       btn.classList.add('active');
-      strokeStyle = btn.dataset.style;
+      currentStyle = btn.dataset.style;
     });
   });
-
   var slLw = document.getElementById('sl-lw');
   var vlLw = document.getElementById('vl-lw');
   slLw.addEventListener('input',function(){
@@ -804,7 +573,6 @@ function bindEvents(){
     lineOpacity = parseFloat(slOp.value);
     vlOp.textContent = lineOpacity.toFixed(2);
   });
-
   var kwin = document.getElementById('kw-input');
   kwin.addEventListener('keydown', function(e){
     if(e.key === 'Enter'){
@@ -813,63 +581,30 @@ function bindEvents(){
       if(val){ markKeyword(val); kwin.value = ''; }
     }
   });
-
   document.getElementById('btn-clear-marks').addEventListener('click', function(){
-    document.querySelectorAll('.svg-overlay').forEach(function(svg){
-      while(svg.lastChild) svg.removeChild(svg.lastChild);
+    document.querySelectorAll('.canvas-overlay').forEach(function(c){
+      var ctx = c.getContext('2d');
+      ctx.clearRect(0,0,c.width,c.height);
     });
     allWordSpans.forEach(function(sp){
-      sp.classList.remove('mark-highlight','mark-redact','mark-strike','mark-circle');
+      sp.classList.remove('mark-highlight','mark-redact','mark-strike');
       sp.style.background = '';
-      sp.style.position = '';
-      sp.innerHTML = sp.textContent;
+      sp.style.textDecoration = '';
+      sp.style.padding = '';
+      sp.style.borderRadius = '';
     });
     keywords = [];
     renderTags();
   });
-
-  document.getElementById('btn-load-text').addEventListener('click', function(){
-    var txt = document.getElementById('txt-input').value.trim();
-    if(txt){
-      var chunks = txt.split(/\n{2,}/);
-      PAGE_TEXTS = [];
-      var chunkSize = Math.ceil(chunks.length / PAGE_COUNT);
-      for(var i=0;i<PAGE_COUNT;i++){
-        PAGE_TEXTS.push(chunks.slice(i*chunkSize,(i+1)*chunkSize).join('\n\n') || PAGE_TEXTS[0]);
-      }
-      buildPages();
-    }
-  });
-  document.getElementById('btn-apply-text').addEventListener('click', function(){
-    document.getElementById('btn-load-text').click();
-  });
-
   document.getElementById('btn-export').addEventListener('click', function(){
     alert('Export coming soon!');
   });
 }
 
-function r(n){ return Math.round(n*10)/10; }
 function hexAlpha(hex, alpha){
   var res = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   if(!res) return hex;
   return 'rgba('+parseInt(res[1],16)+','+parseInt(res[2],16)+','+parseInt(res[3],16)+','+alpha+')';
-}
-
-function buildColorRow(){
-  var row = document.getElementById('color-row');
-  row.innerHTML = '';
-  COLORS.forEach(function(c){
-    var d = document.createElement('div');
-    d.className = 'color-dot' + (c===currentColor?' active':'');
-    d.style.background = c;
-    d.addEventListener('click', function(){
-      currentColor = c;
-      row.querySelectorAll('.color-dot').forEach(function(x){x.classList.remove('active');});
-      d.classList.add('active');
-    });
-    row.appendChild(d);
-  });
 }
 
 init();
