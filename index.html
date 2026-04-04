@@ -75,7 +75,7 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
 .kw-tag .rm{font-size:9px;opacity:.5}
 .kw-tag:hover .rm{opacity:1}
 
-/* CANVAS WRAP — scrolling stage */
+/* CANVAS WRAP */
 #canvas-wrap{
   flex:1;overflow:hidden;position:relative;
   background:var(--bg);
@@ -89,24 +89,20 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
 #scroll-track{
   display:flex;align-items:center;
   position:absolute;top:0;left:0;height:100%;
-  /* animation applied via JS */
 }
 
-/* PAPER */
+/* PAPER — 3 pages, shorter height */
 .paper{
   position:relative;
-  width:520px;height:calc(100vh - var(--header-h) - 64px);
+  width:480px;
+  height:calc(100vh - var(--header-h) - 120px);
   flex-shrink:0;
   background:var(--paper);
-  margin:32px 20px;
-  padding:40px 44px 48px;
+  margin:60px 24px;
+  padding:36px 40px 40px;
   background-image:
     repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(180,160,120,.07) 27px, rgba(180,160,120,.07) 28px);
   overflow:hidden;
-}
-/* active paper gets a subtle top border accent */
-.paper.active-paper{
-  outline:2px solid rgba(192,57,43,.18);
 }
 
 /* TEXT CONTENT */
@@ -122,31 +118,21 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
   font-size:13.5px;
   transition:color .15s;
 }
-.word-span.matched{color:inherit}
 .word-space{display:inline;white-space:pre}
 
 /* MARK EFFECTS */
 .mark-highlight{
-  background:rgba(255,220,50,.45);
-  border-radius:1px;
-  padding:0 1px;
+  position:relative;
+  z-index:2;
 }
 .mark-redact{
   background:#1a1410;
   color:transparent;
   padding:0 2px;
   border-radius:1px;
-  position:relative;
 }
 .mark-strike{
   position:relative;
-}
-.mark-strike::after{
-  content:'';position:absolute;left:-1px;right:-1px;
-  top:50%;height:1.5px;
-  background:#c0392b;
-  transform:rotate(-0.5deg);
-  pointer-events:none;
 }
 .mark-circle{
   position:relative;
@@ -157,12 +143,6 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
 .svg-overlay{
   position:absolute;top:0;left:0;width:100%;height:100%;
   pointer-events:none;z-index:10;overflow:visible;
-}
-
-/* SCROLL ANIMATION */
-@keyframes scroll-left{
-  0%  { transform: translateX(0); }
-  100%{ transform: translateX(-50%); }
 }
 </style>
 </head>
@@ -177,10 +157,7 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
 </header>
 
 <div id="layout">
-
-  <!-- PANEL -->
   <div id="panel">
-
     <div>
       <div class="ps-t">Mark type</div>
       <div style="display:flex;flex-direction:column;gap:5px">
@@ -225,20 +202,17 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
       <textarea id="txt-input" style="width:100%;height:120px;background:var(--bg);color:var(--ink);border:1px solid var(--border);border-radius:4px;padding:8px;font-family:'IM Fell English',serif;font-size:12px;resize:vertical;outline:none;line-height:1.6" placeholder="Paste your text here…"></textarea>
       <button class="btn" style="margin-top:6px;width:100%" id="btn-apply-text">Apply text</button>
     </div>
-
   </div>
 
-  <!-- CANVAS WRAP -->
   <div id="canvas-wrap">
     <div id="scroll-track"></div>
   </div>
-
 </div>
 
 <script>
-// ── Default text chunks — one per page ──
+// ── Default text chunks — 3 pages ──
 var PAGE_TEXTS = [
-  `The relationship between language and thought has occupied philosophers since antiquity. Wittgenstein argued that the limits of one's language are the limits of one's world — a proposition that inverts the ordinary assumption that thought precedes expression.
+  `The relationship between language and thought has occupied philosophers since antiquity. Wittgenstein argued that the limits of one's language are the limits of one's world.
 
 Benjamin's concept of aura — that quality of presence, of unrepeatable occurrence — erodes in the age of mechanical reproduction. Yet the copy proliferates meaning even as it evacuates the original.
 
@@ -246,48 +220,33 @@ Memory is not storage but reconstruction. Each recollection is a new act, shaped
 
   `The archive speaks only to those who already know what they are looking for. The document does not answer; it waits. History is the art of asking the right question.
 
-Rhizome versus tree. The arboreal structure presupposes a root, a foundation, a hierarchy of branches. The rhizome spreads laterally, without center, without origin — multiplicities without unity.
+Rhizome versus tree. The arboreal structure presupposes a root, a foundation, a hierarchy of branches. The rhizome spreads laterally, without center, without origin.
 
-In topology, a surface may be transformed continuously without tearing. The coffee cup and the donut are the same. Form is preserved through deformation. Identity survives distortion.`,
+In topology, a surface may be transformed continuously without tearing. The coffee cup and the donut are the same. Form is preserved through deformation.`,
 
-  `Barthes distinguishes the studium from the punctum: the former a cultural, coded field of interest; the latter a wound, a prick — the accidental detail that pierces the reader of the image.
+  `Barthes distinguishes the studium from the punctum: the former a cultural, coded field of interest; the latter a wound, a prick — the accidental detail that pierces the reader.
 
 Language game, form of life, family resemblance. Ordinary language philosophy insists that meaning is use — not reference, not mental image, but participation in shared practice.
 
 The symptom speaks where the subject cannot. Repression does not erase but displaces — the return of the repressed in dream, in slip, in symptom.`,
-
-  `Every map is a lie. The projection flattens a sphere, selects what counts, erases what does not. Cartography is always already politics.
-
-The flaneur moves through the city as through a text — reading facades, decoding gestures, absorbing the crowd. The city becomes a palimpsest of superimposed histories.
-
-Silence is not absence. Cage's 4'33" demonstrates that the frame creates the work, that attention makes art of whatever falls within it.`,
-
-  `Translation is always betrayal. Something escapes — a resonance, a texture, a pun embedded in the grain of the original tongue. Yet without betrayal, no crossing.
-
-The ruin is not destruction but a form in its own right — nature reclaiming the human, time made visible in stone. Simmel saw in the ruin the perfect unity of culture and nature.
-
-What is an author? A function, Foucault says — a way of classifying and authenticating discourse, a name that organizes the field of reading.`,
 ];
 
-// ── State ──
 var currentTool = 'line';
 var currentColor = '#c0392b';
 var lineWidth = 1.5;
 var lineOpacity = 0.75;
 var keywords = [];
-var allWordSpans = []; // flat array across all pages
-var PAGE_COUNT = 5;
-var SCROLL_SPEED = 35; // seconds per full cycle
+var allWordSpans = [];
+var PAGE_COUNT = 3;
+var SCROLL_SPEED = 25;
 var paused = false;
 
-// ── Colors ──
 var COLORS = [
   '#c0392b','#2980b9','#27ae60','#8e44ad',
   '#e67e22','#16a085','#2c3e50','#7f8c8d',
   '#f39c12','#1abc9c'
 ];
 
-// ── Init ──
 function init(){
   buildColorRow();
   buildPages();
@@ -295,16 +254,13 @@ function init(){
   startScroll();
 }
 
-// ── Build pages ──
 function buildPages(){
   var track = document.getElementById('scroll-track');
   track.innerHTML = '';
   allWordSpans = [];
 
-  // build N pages + duplicate for seamless loop
   var pages = [];
   for(var i=0;i<PAGE_COUNT;i++) pages.push(i);
-  // duplicate
   var allPages = pages.concat(pages);
 
   allPages.forEach(function(idx){
@@ -325,16 +281,14 @@ function buildPages(){
     track.appendChild(paper);
   });
 
-  // set track width
-  track.style.width = (allPages.length * 560) + 'px';
+  track.style.width = (allPages.length * 528) + 'px';
 }
 
-// ── Build text into element ──
 function buildTextInto(layer, text){
   layer.innerHTML = '';
   var spans = [];
   var paragraphs = text.split(/\n+/);
-  var sizes = [13, 13.5, 12.5, 14, 13, 12, 13.5, 14];
+  var sizes = [13, 13.5, 12.5, 14, 13, 12];
 
   paragraphs.forEach(function(para, pi){
     if(!para.trim()) return;
@@ -369,23 +323,21 @@ function buildTextInto(layer, text){
   return spans;
 }
 
-// ── Scroll animation ──
 function startScroll(){
   var track = document.getElementById('scroll-track');
-  var totalW = PAGE_COUNT * 560; // half of track (duplicated)
+  var totalW = PAGE_COUNT * 528;
   var dur = SCROLL_SPEED;
 
   track.style.animation = 'none';
   track.style.transform = 'translateX(0)';
 
-  // manual RAF-based scroll for pause support
   var startTime = null;
   var offset = 0;
 
   function tick(ts){
     if(!startTime) startTime = ts;
     if(!paused){
-      var elapsed = (ts - startTime) / 1000; // seconds
+      var elapsed = (ts - startTime) / 1000;
       offset = (elapsed * (totalW / dur)) % totalW;
       track.style.transform = 'translateX(-' + offset + 'px)';
     } else {
@@ -396,7 +348,6 @@ function startScroll(){
   requestAnimationFrame(tick);
 }
 
-// ── Pause on hover ──
 document.addEventListener('DOMContentLoaded', function(){
   var cw = document.getElementById('canvas-wrap');
   if(cw){
@@ -405,7 +356,130 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 });
 
-// ── Keyword matching ──
+// ── Brush helpers: hand-drawn quality ──
+function brushLine(svg, pts, color, lw, op){
+  if(pts.length < 2) return;
+  
+  // draw 3-5 overlapping strokes for texture
+  var strokes = 3 + Math.floor(Math.random() * 2);
+  for(var s=0; s<strokes; s++){
+    var path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    var d = 'M' + r(pts[0].x) + ',' + r(pts[0].y);
+    
+    for(var i=1; i<pts.length; i++){
+      var prev = pts[i-1];
+      var curr = pts[i];
+      
+      // add wobble
+      var wobbleX = (Math.random() - 0.5) * 2;
+      var wobbleY = (Math.random() - 0.5) * 2;
+      
+      var cp1x = prev.x + (curr.x - prev.x) * 0.3 + wobbleX;
+      var cp1y = prev.y + (curr.y - prev.y) * 0.3 + wobbleY;
+      var cp2x = prev.x + (curr.x - prev.x) * 0.7 + wobbleX;
+      var cp2y = prev.y + (curr.y - prev.y) * 0.7 + wobbleY;
+      
+      d += ' C' + r(cp1x) + ',' + r(cp1y) + ' ' + r(cp2x) + ',' + r(cp2y) + ' ' + r(curr.x + wobbleX) + ',' + r(curr.y + wobbleY);
+    }
+    
+    path.setAttribute('d', d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', color);
+    path.setAttribute('stroke-width', lw * (0.7 + Math.random() * 0.6));
+    path.setAttribute('stroke-opacity', op * (0.3 + s * 0.2));
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(path);
+  }
+  
+  // dots at each point
+  pts.forEach(function(pt){
+    for(var d=0; d<3; d++){
+      var dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      dot.setAttribute('cx', pt.x + (Math.random() - 0.5) * 1.5);
+      dot.setAttribute('cy', pt.y + (Math.random() - 0.5) * 1.5);
+      dot.setAttribute('r', lw * (1.5 + Math.random() * 0.8));
+      dot.setAttribute('fill', color);
+      dot.setAttribute('fill-opacity', op * (0.2 + d * 0.15));
+      svg.appendChild(dot);
+    }
+  });
+  
+  animateStroke(svg.lastChild);
+}
+
+function brushCircle(svg, cx, cy, rx, ry, color){
+  var strokes = 2 + Math.floor(Math.random() * 2);
+  
+  for(var s=0; s<strokes; s++){
+    var el = document.createElementNS('http://www.w3.org/2000/svg','ellipse');
+    var wobbleX = (Math.random() - 0.5) * 3;
+    var wobbleY = (Math.random() - 0.5) * 3;
+    var wobbleRx = (Math.random() - 0.5) * 2;
+    var wobbleRy = (Math.random() - 0.5) * 2;
+    
+    el.setAttribute('cx', cx + wobbleX);
+    el.setAttribute('cy', cy + wobbleY);
+    el.setAttribute('rx', rx + wobbleRx);
+    el.setAttribute('ry', ry + wobbleRy);
+    el.setAttribute('fill', 'none');
+    el.setAttribute('stroke', color);
+    el.setAttribute('stroke-width', 1.2 + Math.random() * 0.6);
+    el.setAttribute('stroke-opacity', 0.4 + s * 0.2);
+    el.setAttribute('transform', 'rotate(' + (Math.random() * 8 - 4) + ',' + cx + ',' + cy + ')');
+    svg.appendChild(el);
+  }
+}
+
+function brushHighlight(sp, color){
+  // multi-layer watercolor wash
+  var layers = 3;
+  for(var i=0; i<layers; i++){
+    var layer = document.createElement('span');
+    layer.style.position = 'absolute';
+    layer.style.left = '-2px';
+    layer.style.right = '-2px';
+    layer.style.top = '-1px';
+    layer.style.bottom = '-1px';
+    layer.style.background = hexAlpha(color, 0.15 + i * 0.08);
+    layer.style.borderRadius = (2 + i) + 'px';
+    layer.style.filter = 'blur(' + (i * 0.5) + 'px)';
+    layer.style.zIndex = '-1';
+    sp.style.position = 'relative';
+    sp.insertBefore(layer, sp.firstChild);
+  }
+}
+
+function brushStrike(sp, color){
+  // double strike with offset
+  var strikes = 2;
+  for(var i=0; i<strikes; i++){
+    var line = document.createElement('span');
+    line.style.position = 'absolute';
+    line.style.left = '-2px';
+    line.style.right = '-2px';
+    line.style.top = '50%';
+    line.style.height = '1.5px';
+    line.style.background = color;
+    line.style.transform = 'translateY(-50%) rotate(' + ((Math.random() - 0.5) * 2) + 'deg)';
+    line.style.opacity = 0.6 + i * 0.2;
+    line.style.pointerEvents = 'none';
+    sp.style.position = 'relative';
+    sp.appendChild(line);
+  }
+}
+
+function animateStroke(el){
+  if(!el || el.tagName !== 'circle') return;
+  el.style.opacity = '0';
+  el.style.transition = 'opacity 0.4s ease-out';
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      el.style.opacity = el.getAttribute('fill-opacity') || '1';
+    });
+  });
+}
+
 function markKeyword(kw){
   var tool = currentTool;
   var color = currentColor;
@@ -421,7 +495,6 @@ function markKeyword(kw){
   if(!matched.length) return;
 
   if(tool === 'line'){
-    // group by paper, connect within each paper
     groupByPaper(matched).forEach(function(group){
       if(group.length >= 2) applyLineConnections(group, color, lw, op);
     });
@@ -448,21 +521,18 @@ function applyMarkToSpan(sp, tool, color){
   sp.classList.remove('mark-highlight','mark-redact','mark-strike','mark-circle');
   if(tool === 'highlight'){
     sp.classList.add('mark-highlight');
-    sp.style.background = hexAlpha(color, 0.4);
+    brushHighlight(sp, color);
   } else if(tool === 'redact'){
     sp.classList.add('mark-redact');
   } else if(tool === 'strike'){
     sp.classList.add('mark-strike');
-    sp.style.textDecoration = 'line-through';
-    sp.style.textDecorationColor = color;
-    sp.style.textDecorationThickness = '1.5px';
+    brushStrike(sp, color);
   } else if(tool === 'circle'){
     sp.classList.add('mark-circle');
     drawCircleAroundSpan(sp, color);
   }
 }
 
-// ── SVG line connections ──
 function applyLineConnections(spans, color, lw, op){
   if(spans.length < 2) return;
   var paper = spans[0].closest('.paper');
@@ -479,94 +549,10 @@ function applyLineConnections(spans, color, lw, op){
   });
 
   spans.forEach(function(sp){
-    sp.style.background = hexAlpha(color, 0.15);
-    sp.style.borderRadius = '2px';
-    sp.style.padding = '0 1px';
+    brushHighlight(sp, color);
   });
 
-  animatePath(svg, pts, color, lw, op);
-}
-
-function animatePath(svg, pts, color, lw, op){
-  if(pts.length < 2) return;
-  var d = buildSmoothPath(pts);
-  var path = document.createElementNS('http://www.w3.org/2000/svg','path');
-  path.setAttribute('d', d);
-  path.setAttribute('fill','none');
-  path.setAttribute('stroke', color);
-  path.setAttribute('stroke-width', lw);
-  path.setAttribute('stroke-opacity', op);
-  path.setAttribute('stroke-linecap','round');
-  path.setAttribute('stroke-linejoin','round');
-
-  var filterId = 'wobble-' + Date.now();
-  var defs = svg.querySelector('defs') || svg.insertBefore(document.createElementNS('http://www.w3.org/2000/svg','defs'), svg.firstChild);
-  var filt = document.createElementNS('http://www.w3.org/2000/svg','filter');
-  filt.setAttribute('id', filterId);
-  filt.setAttribute('x','-5%');filt.setAttribute('y','-5%');
-  filt.setAttribute('width','110%');filt.setAttribute('height','110%');
-  var turb = document.createElementNS('http://www.w3.org/2000/svg','feTurbulence');
-  turb.setAttribute('type','turbulence');
-  turb.setAttribute('baseFrequency','0.05');
-  turb.setAttribute('numOctaves','2');
-  turb.setAttribute('result','noise');
-  var disp = document.createElementNS('http://www.w3.org/2000/svg','feDisplacementMap');
-  disp.setAttribute('in','SourceGraphic');
-  disp.setAttribute('in2','noise');
-  disp.setAttribute('scale','1.5');
-  disp.setAttribute('xChannelSelector','R');
-  disp.setAttribute('yChannelSelector','G');
-  filt.appendChild(turb);
-  filt.appendChild(disp);
-  defs.appendChild(filt);
-  path.setAttribute('filter','url(#'+filterId+')');
-  svg.appendChild(path);
-
-  var length = path.getTotalLength();
-  path.style.strokeDasharray = length;
-  path.style.strokeDashoffset = length;
-  path.style.transition = 'none';
-
-  pts.forEach(function(pt){
-    var dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
-    dot.setAttribute('cx', pt.x);
-    dot.setAttribute('cy', pt.y);
-    dot.setAttribute('r', lw * 2.5);
-    dot.setAttribute('fill', color);
-    dot.setAttribute('fill-opacity', op);
-    svg.appendChild(dot);
-  });
-
-  requestAnimationFrame(function(){
-    requestAnimationFrame(function(){
-      var dur = Math.min(1800, 600 + length * 0.8);
-      path.style.transition = 'stroke-dashoffset ' + dur + 'ms cubic-bezier(0.4,0,0.2,1)';
-      path.style.strokeDashoffset = 0;
-    });
-  });
-}
-
-function buildSmoothPath(pts){
-  if(pts.length === 2){
-    var p0 = pts[0], p1 = pts[1];
-    var dx = p1.x - p0.x, dy = p1.y - p0.y;
-    var mx = (p0.x+p1.x)/2 + dy*0.25 + (Math.random()-.5)*30;
-    var my = (p0.y+p1.y)/2 - dx*0.25 + (Math.random()-.5)*20;
-    return 'M'+r(p0.x)+','+r(p0.y)+' Q'+r(mx)+','+r(my)+' '+r(p1.x)+','+r(p1.y);
-  }
-  var d = 'M'+r(pts[0].x)+','+r(pts[0].y);
-  for(var i=0;i<pts.length-1;i++){
-    var p0 = pts[Math.max(0,i-1)];
-    var p1 = pts[i];
-    var p2 = pts[i+1];
-    var p3 = pts[Math.min(pts.length-1,i+2)];
-    var cp1x = p1.x + (p2.x-p0.x)/6 + (Math.random()-.5)*8;
-    var cp1y = p1.y + (p2.y-p0.y)/6 + (Math.random()-.5)*8;
-    var cp2x = p2.x - (p3.x-p1.x)/6 + (Math.random()-.5)*8;
-    var cp2y = p2.y - (p3.y-p1.y)/6 + (Math.random()-.5)*8;
-    d += ' C'+r(cp1x)+','+r(cp1y)+' '+r(cp2x)+','+r(cp2y)+' '+r(p2.x)+','+r(p2.y);
-  }
-  return d;
+  brushLine(svg, pts, color, lw, op);
 }
 
 function drawCircleAroundSpan(sp, color){
@@ -578,18 +564,9 @@ function drawCircleAroundSpan(sp, color){
   var cy = r2.top - paperRect.top + r2.height/2;
   var rx = r2.width/2 + 6;
   var ry = r2.height/2 + 5;
-  var el = document.createElementNS('http://www.w3.org/2000/svg','ellipse');
-  el.setAttribute('cx', cx); el.setAttribute('cy', cy);
-  el.setAttribute('rx', rx); el.setAttribute('ry', ry);
-  el.setAttribute('fill','none');
-  el.setAttribute('stroke',color);
-  el.setAttribute('stroke-width','1.5');
-  el.setAttribute('stroke-opacity','0.8');
-  el.setAttribute('transform','rotate('+(Math.random()*6-3)+','+cx+','+cy+')');
-  svg.appendChild(el);
+  brushCircle(svg, cx, cy, rx, ry, color);
 }
 
-// ── Tags ──
 function renderTags(){
   var c = document.getElementById('kw-tags');
   c.innerHTML = '';
@@ -607,7 +584,6 @@ function renderTags(){
   });
 }
 
-// ── Events ──
 function bindEvents(){
   document.querySelectorAll('.tool-btn').forEach(function(btn){
     btn.addEventListener('click',function(){
@@ -646,9 +622,8 @@ function bindEvents(){
     allWordSpans.forEach(function(sp){
       sp.classList.remove('mark-highlight','mark-redact','mark-strike','mark-circle');
       sp.style.background = '';
-      sp.style.textDecoration = '';
-      sp.style.padding = '';
-      sp.style.borderRadius = '';
+      sp.style.position = '';
+      sp.innerHTML = sp.textContent;
     });
     keywords = [];
     renderTags();
@@ -657,7 +632,6 @@ function bindEvents(){
   document.getElementById('btn-load-text').addEventListener('click', function(){
     var txt = document.getElementById('txt-input').value.trim();
     if(txt){
-      // split into chunks per page
       var chunks = txt.split(/\n{2,}/);
       PAGE_TEXTS = [];
       var chunkSize = Math.ceil(chunks.length / PAGE_COUNT);
@@ -676,7 +650,6 @@ function bindEvents(){
   });
 }
 
-// ── Helpers ──
 function r(n){ return Math.round(n*10)/10; }
 function hexAlpha(hex, alpha){
   var res = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -698,394 +671,6 @@ function buildColorRow(){
     });
     row.appendChild(d);
   });
-}
-
-init();
-</script>
-
-// ── State ──
-var currentTool = 'line';
-var currentColor = '#c0392b';
-var lineWidth = 1.5;
-var lineOpacity = 0.75;
-var keywords = []; // {word, color, tool}
-var wordSpans = []; // DOM spans
-var marks = []; // drawn marks {type, positions, color, lw, op}
-var animating = false;
-
-// ── Colors ──
-var COLORS = [
-  '#c0392b','#2980b9','#27ae60','#8e44ad',
-  '#e67e22','#16a085','#2c3e50','#7f8c8d',
-  '#f39c12','#1abc9c'
-];
-
-// ── Init ──
-function init(){
-  buildColorRow();
-  buildText(DEFAULT_TEXT);
-  document.getElementById('txt-input').value = DEFAULT_TEXT;
-  bindEvents();
-}
-
-function buildColorRow(){
-  var row = document.getElementById('color-row');
-  row.innerHTML = '';
-  COLORS.forEach(function(c){
-    var d = document.createElement('div');
-    d.className = 'color-dot' + (c===currentColor?' active':'');
-    d.style.background = c;
-    d.addEventListener('click', function(){
-      currentColor = c;
-      row.querySelectorAll('.color-dot').forEach(function(x){x.classList.remove('active');});
-      d.classList.add('active');
-    });
-    row.appendChild(d);
-  });
-}
-
-// ── Build text ──
-function buildText(text){
-  var layer = document.getElementById('text-layer');
-  layer.innerHTML = '';
-  wordSpans = [];
-
-  var paragraphs = text.split(/\n+/);
-  paragraphs.forEach(function(para, pi){
-    if(!para.trim()) return;
-    var p = document.createElement('p');
-    p.style.marginBottom = (pi < paragraphs.length-1) ? '22px' : '0';
-    // vary font size slightly per paragraph for "notes" feel
-    var sizes = [13, 13.5, 12.5, 14, 13, 12, 13.5, 14];
-    p.style.fontSize = (sizes[pi % sizes.length]) + 'px';
-    // slight rotation on some paragraphs
-    if(pi % 3 === 1) p.style.transform = 'rotate(-0.15deg)';
-    if(pi % 5 === 3) p.style.transform = 'rotate(0.1deg)';
-
-    var tokens = para.split(/(\s+)/);
-    tokens.forEach(function(tok){
-      if(/^\s+$/.test(tok)){
-        var sp = document.createElement('span');
-        sp.className = 'word-space';
-        sp.textContent = tok;
-        p.appendChild(sp);
-      } else {
-        // split on punctuation boundaries but keep them
-        var parts = tok.split(/(?=[,\.;:!?—])|(?<=[,\.;:!?—])/);
-        parts.forEach(function(part){
-          if(!part) return;
-          var sp = document.createElement('span');
-          sp.className = 'word-span';
-          sp.textContent = part;
-          sp.dataset.word = part.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,'').toLowerCase();
-          wordSpans.push(sp);
-          p.appendChild(sp);
-        });
-      }
-    });
-    layer.appendChild(p);
-  });
-}
-
-// ── Keyword matching ──
-function markKeyword(kw){
-  var tool = currentTool;
-  var color = currentColor;
-  var lw = lineWidth;
-  var op = lineOpacity;
-
-  var word = kw.toLowerCase().trim();
-  if(!word) return;
-
-  // find matching spans
-  var matched = wordSpans.filter(function(sp){
-    return sp.dataset.word === word || sp.dataset.word.includes(word) || word.includes(sp.dataset.word) && sp.dataset.word.length > 2;
-  });
-  if(!matched.length) return;
-
-  if(tool === 'line'){
-    // connect matched spans with animated bezier lines
-    applyLineConnections(matched, color, lw, op);
-  } else {
-    matched.forEach(function(sp){
-      applyMarkToSpan(sp, tool, color);
-    });
-  }
-
-  // add to keyword tags
-  keywords.push({word:kw, color:color, tool:tool});
-  renderTags();
-}
-
-function applyMarkToSpan(sp, tool, color){
-  // remove existing mark classes
-  sp.classList.remove('mark-highlight','mark-redact','mark-strike','mark-circle');
-  if(tool === 'highlight'){
-    sp.classList.add('mark-highlight');
-    sp.style.background = hexAlpha(color, 0.4);
-  } else if(tool === 'redact'){
-    sp.classList.add('mark-redact');
-  } else if(tool === 'strike'){
-    sp.classList.add('mark-strike');
-    sp.style.setProperty('--strike-color', color);
-    // override the ::after color via inline style workaround
-    sp.style.textDecoration = 'line-through';
-    sp.style.textDecorationColor = color;
-    sp.style.textDecorationThickness = '1.5px';
-  } else if(tool === 'circle'){
-    sp.classList.add('mark-circle');
-    drawCircleAroundSpan(sp, color);
-  }
-}
-
-// ── SVG line connections ──
-function applyLineConnections(spans, color, lw, op){
-  if(spans.length < 2) return;
-  var paper = document.getElementById('paper');
-  var svg = document.getElementById('svg-overlay');
-  var paperRect = paper.getBoundingClientRect();
-
-  // get center of each span relative to paper
-  var pts = spans.map(function(sp){
-    var r = sp.getBoundingClientRect();
-    return {
-      x: r.left - paperRect.left + r.width/2,
-      y: r.top - paperRect.top + r.height/2,
-      sp: sp
-    };
-  });
-
-  // highlight the matched spans lightly
-  spans.forEach(function(sp){
-    sp.style.background = hexAlpha(color, 0.15);
-    sp.style.borderRadius = '2px';
-    sp.style.padding = '0 1px';
-  });
-
-  // draw path connecting them with bezier curves
-  animatePath(svg, pts, color, lw, op);
-}
-
-function animatePath(svg, pts, color, lw, op){
-  if(pts.length < 2) return;
-
-  // build a smooth path through all points
-  var d = buildSmoothPath(pts);
-
-  var path = document.createElementNS('http://www.w3.org/2000/svg','path');
-  path.setAttribute('d', d);
-  path.setAttribute('fill','none');
-  path.setAttribute('stroke', color);
-  path.setAttribute('stroke-width', lw);
-  path.setAttribute('stroke-opacity', op);
-  path.setAttribute('stroke-linecap','round');
-  path.setAttribute('stroke-linejoin','round');
-
-  // slight hand-drawn wobble: use filter
-  var filterId = 'wobble-' + Date.now();
-  var defs = svg.querySelector('defs') || svg.insertBefore(document.createElementNS('http://www.w3.org/2000/svg','defs'), svg.firstChild);
-  var filt = document.createElementNS('http://www.w3.org/2000/svg','filter');
-  filt.setAttribute('id', filterId);
-  filt.setAttribute('x','-5%');filt.setAttribute('y','-5%');
-  filt.setAttribute('width','110%');filt.setAttribute('height','110%');
-  var turb = document.createElementNS('http://www.w3.org/2000/svg','feTurbulence');
-  turb.setAttribute('type','turbulence');
-  turb.setAttribute('baseFrequency','0.05');
-  turb.setAttribute('numOctaves','2');
-  turb.setAttribute('result','noise');
-  var disp = document.createElementNS('http://www.w3.org/2000/svg','feDisplacementMap');
-  disp.setAttribute('in','SourceGraphic');
-  disp.setAttribute('in2','noise');
-  disp.setAttribute('scale','1.5');
-  disp.setAttribute('xChannelSelector','R');
-  disp.setAttribute('yChannelSelector','G');
-  filt.appendChild(turb);
-  filt.appendChild(disp);
-  defs.appendChild(filt);
-  path.setAttribute('filter','url(#'+filterId+')');
-
-  svg.appendChild(path);
-
-  // animate draw-on
-  var length = path.getTotalLength();
-  path.style.strokeDasharray = length;
-  path.style.strokeDashoffset = length;
-  path.style.transition = 'none';
-
-  // small dots at each matched word
-  pts.forEach(function(pt){
-    var dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
-    dot.setAttribute('cx', pt.x);
-    dot.setAttribute('cy', pt.y);
-    dot.setAttribute('r', lw * 2.5);
-    dot.setAttribute('fill', color);
-    dot.setAttribute('fill-opacity', op);
-    svg.appendChild(dot);
-  });
-
-  requestAnimationFrame(function(){
-    requestAnimationFrame(function(){
-      var dur = Math.min(1800, 600 + length * 0.8);
-      path.style.transition = 'stroke-dashoffset ' + dur + 'ms cubic-bezier(0.4,0,0.2,1)';
-      path.style.strokeDashoffset = 0;
-    });
-  });
-}
-
-function buildSmoothPath(pts){
-  if(pts.length === 2){
-    // single bezier with slight arc
-    var p0 = pts[0], p1 = pts[1];
-    var dx = p1.x - p0.x, dy = p1.y - p0.y;
-    var mx = (p0.x+p1.x)/2 + dy*0.25 + (Math.random()-.5)*30;
-    var my = (p0.y+p1.y)/2 - dx*0.25 + (Math.random()-.5)*20;
-    return 'M'+r(p0.x)+','+r(p0.y)+' Q'+r(mx)+','+r(my)+' '+r(p1.x)+','+r(p1.y);
-  }
-  // catmull-rom → bezier for multiple points
-  var d = 'M'+r(pts[0].x)+','+r(pts[0].y);
-  for(var i=0;i<pts.length-1;i++){
-    var p0 = pts[Math.max(0,i-1)];
-    var p1 = pts[i];
-    var p2 = pts[i+1];
-    var p3 = pts[Math.min(pts.length-1,i+2)];
-    var cp1x = p1.x + (p2.x-p0.x)/6;
-    var cp1y = p1.y + (p2.y-p0.y)/6;
-    var cp2x = p2.x - (p3.x-p1.x)/6;
-    var cp2y = p2.y - (p3.y-p1.y)/6;
-    // add tiny random wobble
-    cp1x += (Math.random()-.5)*8; cp1y += (Math.random()-.5)*8;
-    cp2x += (Math.random()-.5)*8; cp2y += (Math.random()-.5)*8;
-    d += ' C'+r(cp1x)+','+r(cp1y)+' '+r(cp2x)+','+r(cp2y)+' '+r(p2.x)+','+r(p2.y);
-  }
-  return d;
-}
-
-function drawCircleAroundSpan(sp, color){
-  var paper = document.getElementById('paper');
-  var svg = document.getElementById('svg-overlay');
-  var paperRect = paper.getBoundingClientRect();
-  var r2 = sp.getBoundingClientRect();
-  var cx = r2.left - paperRect.left + r2.width/2;
-  var cy = r2.top - paperRect.top + r2.height/2;
-  var rx = r2.width/2 + 6;
-  var ry = r2.height/2 + 5;
-
-  // hand-drawn ellipse via path
-  var path = document.createElementNS('http://www.w3.org/2000/svg','ellipse');
-  path.setAttribute('cx', cx);
-  path.setAttribute('cy', cy);
-  path.setAttribute('rx', rx);
-  path.setAttribute('ry', ry);
-  path.setAttribute('fill','none');
-  path.setAttribute('stroke',color);
-  path.setAttribute('stroke-width','1.5');
-  path.setAttribute('stroke-opacity','0.8');
-  path.setAttribute('transform','rotate('+(Math.random()*6-3)+','+cx+','+cy+')');
-  svg.appendChild(path);
-}
-
-// ── Tags ──
-function renderTags(){
-  var c = document.getElementById('kw-tags');
-  c.innerHTML = '';
-  keywords.forEach(function(kw, i){
-    var tag = document.createElement('div');
-    tag.className = 'kw-tag';
-    tag.style.borderColor = kw.color;
-    tag.style.color = kw.color;
-    tag.innerHTML = kw.word + ' <span class="rm">✕</span>';
-    tag.addEventListener('click', function(){
-      keywords.splice(i,1);
-      renderTags();
-    });
-    c.appendChild(tag);
-  });
-}
-
-// ── Events ──
-function bindEvents(){
-  // tool buttons
-  document.querySelectorAll('.tool-btn').forEach(function(btn){
-    btn.addEventListener('click',function(){
-      document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.remove('active');});
-      btn.classList.add('active');
-      currentTool = btn.dataset.tool;
-    });
-  });
-
-  // sliders
-  var slLw = document.getElementById('sl-lw');
-  var vlLw = document.getElementById('vl-lw');
-  slLw.addEventListener('input',function(){
-    lineWidth = parseFloat(slLw.value);
-    vlLw.textContent = lineWidth;
-  });
-  var slOp = document.getElementById('sl-op');
-  var vlOp = document.getElementById('vl-op');
-  slOp.addEventListener('input',function(){
-    lineOpacity = parseFloat(slOp.value);
-    vlOp.textContent = lineOpacity.toFixed(2);
-  });
-
-  // keyword input
-  var kwin = document.getElementById('kw-input');
-  kwin.addEventListener('keydown', function(e){
-    if(e.key === 'Enter'){
-      e.preventDefault();
-      var val = kwin.value.trim();
-      if(val){
-        markKeyword(val);
-        kwin.value = '';
-      }
-    }
-  });
-
-  // clear marks
-  document.getElementById('btn-clear-marks').addEventListener('click', function(){
-    // remove svg children except defs
-    var svg = document.getElementById('svg-overlay');
-    while(svg.lastChild) svg.removeChild(svg.lastChild);
-    // remove span marks
-    wordSpans.forEach(function(sp){
-      sp.classList.remove('mark-highlight','mark-redact','mark-strike','mark-circle');
-      sp.style.background = '';
-      sp.style.textDecoration = '';
-      sp.style.padding = '';
-      sp.style.borderRadius = '';
-      sp.style.color = '';
-    });
-    keywords = [];
-    renderTags();
-  });
-
-  // load text
-  document.getElementById('btn-load-text').addEventListener('click', function(){
-    var txt = document.getElementById('txt-input').value.trim();
-    if(txt) buildText(txt);
-  });
-  document.getElementById('btn-apply-text').addEventListener('click', function(){
-    var txt = document.getElementById('txt-input').value.trim();
-    if(txt) buildText(txt);
-  });
-
-  // export PNG
-  document.getElementById('btn-export').addEventListener('click', exportPNG);
-}
-
-// ── Export ──
-function exportPNG(){
-  var paper = document.getElementById('paper');
-  // html2canvas-lite approach: open paper in new window for now
-  // TODO: implement proper canvas export
-  alert('Export coming soon — try screenshotting for now!');
-}
-
-// ── Helpers ──
-function r(n){ return Math.round(n*10)/10; }
-function hexAlpha(hex, alpha){
-  var res = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if(!res) return hex;
-  return 'rgba('+parseInt(res[1],16)+','+parseInt(res[2],16)+','+parseInt(res[3],16)+','+alpha+')';
 }
 
 init();
