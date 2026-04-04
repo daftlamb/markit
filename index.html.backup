@@ -13,6 +13,7 @@
 }
 html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'Outfit',sans-serif;font-size:13px;color:var(--ink)}
 
+/* HEADER */
 header{
   height:var(--header-h);background:var(--paper);border-bottom:1px solid var(--border);
   display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0;z-index:100;position:relative;
@@ -27,8 +28,10 @@ header{
 .btn.danger{border-color:#c0392b;color:#c0392b}
 .btn.danger:hover{background:#c0392b;color:#fff}
 
+/* LAYOUT */
 #layout{display:flex;flex:1;height:calc(100vh - var(--header-h));overflow:hidden}
 
+/* PANEL */
 #panel{
   width:240px;flex-shrink:0;background:var(--paper);border-right:1px solid var(--border);
   display:flex;flex-direction:column;padding:16px 14px;gap:14px;overflow-y:auto;
@@ -53,6 +56,7 @@ header{
 input[type=range]{flex:1;accent-color:#c0392b;height:3px}
 .val{width:22px;text-align:right;flex-shrink:0;color:var(--muted)}
 
+/* KEYWORD INPUT */
 #kw-area{display:flex;flex-direction:column;gap:0}
 #kw-input{
   width:100%;border:1px solid var(--border);background:var(--bg);
@@ -71,6 +75,7 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
 .kw-tag .rm{font-size:9px;opacity:.5}
 .kw-tag:hover .rm{opacity:1}
 
+/* CANVAS WRAP */
 #canvas-wrap{
   flex:1;overflow:hidden;position:relative;
   background:var(--bg);
@@ -80,11 +85,13 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
   background-size:28px 28px;
 }
 
+/* SCROLL TRACK */
 #scroll-track{
   display:flex;align-items:center;
   position:absolute;top:0;left:0;height:100%;
 }
 
+/* PAPER — 3 pages, shorter height */
 .paper{
   position:relative;
   width:480px;
@@ -98,6 +105,7 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
   overflow:hidden;
 }
 
+/* TEXT CONTENT */
 .text-layer{
   position:relative;z-index:1;
   font-family:'IM Fell English',serif;
@@ -112,11 +120,26 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
 }
 .word-space{display:inline;white-space:pre}
 
-.mark-highlight{position:relative;z-index:2}
-.mark-redact{background:#1a1410;color:transparent;padding:0 2px;border-radius:1px}
-.mark-strike{position:relative}
-.mark-circle{position:relative;z-index:2}
+/* MARK EFFECTS */
+.mark-highlight{
+  position:relative;
+  z-index:2;
+}
+.mark-redact{
+  background:#1a1410;
+  color:transparent;
+  padding:0 2px;
+  border-radius:1px;
+}
+.mark-strike{
+  position:relative;
+}
+.mark-circle{
+  position:relative;
+  z-index:2;
+}
 
+/* SVG OVERLAY */
 .svg-overlay{
   position:absolute;top:0;left:0;width:100%;height:100%;
   pointer-events:none;z-index:10;overflow:visible;
@@ -143,6 +166,16 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
         <button class="tool-btn" data-tool="redact">█ redact</button>
         <button class="tool-btn" data-tool="strike">⟵ strikethrough</button>
         <button class="tool-btn" data-tool="circle">○ circle</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="ps-t">Brush style</div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <button class="tool-btn" data-brush="ink">✒ Ink</button>
+        <button class="tool-btn active" data-brush="brush">🖌 Brush</button>
+        <button class="tool-btn" data-brush="pencil">✏ Pencil</button>
+        <button class="tool-btn" data-brush="marker">▬ Marker</button>
       </div>
     </div>
 
@@ -220,9 +253,9 @@ The symptom speaks where the subject cannot. Repression does not erase but displ
 
 var currentTool = 'line';
 var currentColor = '#c0392b';
-var strokeStyle = 'ink';
 var lineWidth = 1.5;
 var lineOpacity = 0.75;
+var brushMode = 'brush';
 var keywords = [];
 var allWordSpans = [];
 var PAGE_COUNT = 3;
@@ -344,242 +377,104 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 });
 
-// ── Brush styles: Ink, Brush, Pencil, Marker ──
+// ── Brush helpers: hand-drawn quality ──
 function brushLine(svg, pts, color, lw, op){
   if(pts.length < 2) return;
   
-  if(strokeStyle === 'ink'){
-    // Ink: clean SVG line with subtle filter
+  // draw 3-5 overlapping strokes for texture
+  var strokes = 3 + Math.floor(Math.random() * 2);
+  for(var s=0; s<strokes; s++){
     var path = document.createElementNS('http://www.w3.org/2000/svg','path');
     var d = 'M' + r(pts[0].x) + ',' + r(pts[0].y);
+    
     for(var i=1; i<pts.length; i++){
-      d += ' L' + r(pts[i].x) + ',' + r(pts[i].y);
+      var prev = pts[i-1];
+      var curr = pts[i];
+      
+      // add wobble
+      var wobbleX = (Math.random() - 0.5) * 2;
+      var wobbleY = (Math.random() - 0.5) * 2;
+      
+      var cp1x = prev.x + (curr.x - prev.x) * 0.3 + wobbleX;
+      var cp1y = prev.y + (curr.y - prev.y) * 0.3 + wobbleY;
+      var cp2x = prev.x + (curr.x - prev.x) * 0.7 + wobbleX;
+      var cp2y = prev.y + (curr.y - prev.y) * 0.7 + wobbleY;
+      
+      d += ' C' + r(cp1x) + ',' + r(cp1y) + ' ' + r(cp2x) + ',' + r(cp2y) + ' ' + r(curr.x + wobbleX) + ',' + r(curr.y + wobbleY);
     }
+    
     path.setAttribute('d', d);
     path.setAttribute('fill', 'none');
     path.setAttribute('stroke', color);
-    path.setAttribute('stroke-width', lw);
-    path.setAttribute('stroke-opacity', op);
+    path.setAttribute('stroke-width', lw * (0.7 + Math.random() * 0.6));
+    path.setAttribute('stroke-opacity', op * (0.3 + s * 0.2));
     path.setAttribute('stroke-linecap', 'round');
     path.setAttribute('stroke-linejoin', 'round');
-    path.setAttribute('filter', 'url(#ink-filter)');
     svg.appendChild(path);
-    ensureInkFilter(svg);
   }
-  else if(strokeStyle === 'brush'){
-    // Brush: multiple overlapping strokes with wobble
-    var strokes = 4 + Math.floor(Math.random() * 3);
-    for(var s=0; s<strokes; s++){
-      var path = document.createElementNS('http://www.w3.org/2000/svg','path');
-      var d = 'M' + r(pts[0].x) + ',' + r(pts[0].y);
-      
-      for(var i=1; i<pts.length; i++){
-        var prev = pts[i-1];
-        var curr = pts[i];
-        var wobbleX = (Math.random() - 0.5) * 2.5;
-        var wobbleY = (Math.random() - 0.5) * 2.5;
-        var cp1x = prev.x + (curr.x - prev.x) * 0.3 + wobbleX;
-        var cp1y = prev.y + (curr.y - prev.y) * 0.3 + wobbleY;
-        var cp2x = prev.x + (curr.x - prev.x) * 0.7 + wobbleX;
-        var cp2y = prev.y + (curr.y - prev.y) * 0.7 + wobbleY;
-        d += ' C' + r(cp1x) + ',' + r(cp1y) + ' ' + r(cp2x) + ',' + r(cp2y) + ' ' + r(curr.x + wobbleX) + ',' + r(curr.y + wobbleY);
-      }
-      
-      path.setAttribute('d', d);
-      path.setAttribute('fill', 'none');
-      path.setAttribute('stroke', color);
-      path.setAttribute('stroke-width', lw * (0.6 + Math.random() * 0.8));
-      path.setAttribute('stroke-opacity', op * (0.25 + s * 0.15));
-      path.setAttribute('stroke-linecap', 'round');
-      path.setAttribute('stroke-linejoin', 'round');
-      svg.appendChild(path);
+  
+  // dots at each point
+  pts.forEach(function(pt){
+    for(var d=0; d<3; d++){
+      var dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      dot.setAttribute('cx', pt.x + (Math.random() - 0.5) * 1.5);
+      dot.setAttribute('cy', pt.y + (Math.random() - 0.5) * 1.5);
+      dot.setAttribute('r', lw * (1.5 + Math.random() * 0.8));
+      dot.setAttribute('fill', color);
+      dot.setAttribute('fill-opacity', op * (0.2 + d * 0.15));
+      svg.appendChild(dot);
     }
-    
-    // Add texture dots
-    pts.forEach(function(pt){
-      for(var d=0; d<4; d++){
-        var dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
-        dot.setAttribute('cx', pt.x + (Math.random() - 0.5) * 2);
-        dot.setAttribute('cy', pt.y + (Math.random() - 0.5) * 2);
-        dot.setAttribute('r', lw * (1.2 + Math.random() * 0.6));
-        dot.setAttribute('fill', color);
-        dot.setAttribute('fill-opacity', op * (0.15 + d * 0.1));
-        svg.appendChild(dot);
-      }
-    });
-  }
-  else if(strokeStyle === 'pencil'){
-    // Pencil: thin gray line with noise texture
-    var grayColor = toGrayscale(color);
-    var strokes = 2 + Math.floor(Math.random() * 2);
-    for(var s=0; s<strokes; s++){
-      var path = document.createElementNS('http://www.w3.org/2000/svg','path');
-      var d = 'M' + r(pts[0].x) + ',' + r(pts[0].y);
-      for(var i=1; i<pts.length; i++){
-        var wobbleX = (Math.random() - 0.5) * 1;
-        var wobbleY = (Math.random() - 0.5) * 1;
-        d += ' L' + r(pts[i].x + wobbleX) + ',' + r(pts[i].y + wobbleY);
-      }
-      path.setAttribute('d', d);
-      path.setAttribute('fill', 'none');
-      path.setAttribute('stroke', grayColor);
-      path.setAttribute('stroke-width', lw * 0.7);
-      path.setAttribute('stroke-opacity', op * (0.5 + s * 0.2));
-      path.setAttribute('stroke-linecap', 'round');
-      svg.appendChild(path);
-    }
-    
-    // Add pencil grain
-    for(var i=0; i<pts.length * 3; i++){
-      var idx = Math.floor(Math.random() * pts.length);
-      var pt = pts[idx];
-      var grain = document.createElementNS('http://www.w3.org/2000/svg','circle');
-      grain.setAttribute('cx', pt.x + (Math.random() - 0.5) * 4);
-      grain.setAttribute('cy', pt.y + (Math.random() - 0.5) * 4);
-      grain.setAttribute('r', 0.3 + Math.random() * 0.4);
-      grain.setAttribute('fill', grayColor);
-      grain.setAttribute('fill-opacity', op * 0.3);
-      svg.appendChild(grain);
-    }
-  }
-  else if(strokeStyle === 'marker'){
-    // Marker: thick semi-transparent overlapping strokes
-    var strokes = 3;
-    for(var s=0; s<strokes; s++){
-      var path = document.createElementNS('http://www.w3.org/2000/svg','path');
-      var d = 'M' + r(pts[0].x) + ',' + r(pts[0].y);
-      for(var i=1; i<pts.length; i++){
-        var wobbleX = (Math.random() - 0.5) * 1.5;
-        var wobbleY = (Math.random() - 0.5) * 1.5;
-        d += ' L' + r(pts[i].x + wobbleX) + ',' + r(pts[i].y + wobbleY);
-      }
-      path.setAttribute('d', d);
-      path.setAttribute('fill', 'none');
-      path.setAttribute('stroke', color);
-      path.setAttribute('stroke-width', lw * (2 + s * 0.3));
-      path.setAttribute('stroke-opacity', op * 0.35);
-      path.setAttribute('stroke-linecap', 'round');
-      path.setAttribute('stroke-linejoin', 'round');
-      svg.appendChild(path);
-    }
-  }
+  });
+  
+  animateStroke(svg.lastChild);
 }
 
 function brushCircle(svg, cx, cy, rx, ry, color){
-  if(strokeStyle === 'ink'){
+  var strokes = 2 + Math.floor(Math.random() * 2);
+  
+  for(var s=0; s<strokes; s++){
     var el = document.createElementNS('http://www.w3.org/2000/svg','ellipse');
-    el.setAttribute('cx', cx);
-    el.setAttribute('cy', cy);
-    el.setAttribute('rx', rx);
-    el.setAttribute('ry', ry);
+    var wobbleX = (Math.random() - 0.5) * 3;
+    var wobbleY = (Math.random() - 0.5) * 3;
+    var wobbleRx = (Math.random() - 0.5) * 2;
+    var wobbleRy = (Math.random() - 0.5) * 2;
+    
+    el.setAttribute('cx', cx + wobbleX);
+    el.setAttribute('cy', cy + wobbleY);
+    el.setAttribute('rx', rx + wobbleRx);
+    el.setAttribute('ry', ry + wobbleRy);
     el.setAttribute('fill', 'none');
     el.setAttribute('stroke', color);
-    el.setAttribute('stroke-width', 1.5);
-    el.setAttribute('stroke-opacity', 0.7);
-    el.setAttribute('filter', 'url(#ink-filter)');
+    el.setAttribute('stroke-width', 1.2 + Math.random() * 0.6);
+    el.setAttribute('stroke-opacity', 0.4 + s * 0.2);
+    el.setAttribute('transform', 'rotate(' + (Math.random() * 8 - 4) + ',' + cx + ',' + cy + ')');
     svg.appendChild(el);
-    ensureInkFilter(svg);
-  }
-  else if(strokeStyle === 'brush'){
-    var strokes = 3 + Math.floor(Math.random() * 2);
-    for(var s=0; s<strokes; s++){
-      var el = document.createElementNS('http://www.w3.org/2000/svg','ellipse');
-      var wobbleX = (Math.random() - 0.5) * 3;
-      var wobbleY = (Math.random() - 0.5) * 3;
-      var wobbleRx = (Math.random() - 0.5) * 2;
-      var wobbleRy = (Math.random() - 0.5) * 2;
-      el.setAttribute('cx', cx + wobbleX);
-      el.setAttribute('cy', cy + wobbleY);
-      el.setAttribute('rx', rx + wobbleRx);
-      el.setAttribute('ry', ry + wobbleRy);
-      el.setAttribute('fill', 'none');
-      el.setAttribute('stroke', color);
-      el.setAttribute('stroke-width', 1.2 + Math.random() * 0.6);
-      el.setAttribute('stroke-opacity', 0.4 + s * 0.15);
-      el.setAttribute('transform', 'rotate(' + (Math.random() * 8 - 4) + ',' + cx + ',' + cy + ')');
-      svg.appendChild(el);
-    }
-  }
-  else if(strokeStyle === 'pencil'){
-    var grayColor = toGrayscale(color);
-    var strokes = 2;
-    for(var s=0; s<strokes; s++){
-      var el = document.createElementNS('http://www.w3.org/2000/svg','ellipse');
-      el.setAttribute('cx', cx + (Math.random() - 0.5) * 1);
-      el.setAttribute('cy', cy + (Math.random() - 0.5) * 1);
-      el.setAttribute('rx', rx);
-      el.setAttribute('ry', ry);
-      el.setAttribute('fill', 'none');
-      el.setAttribute('stroke', grayColor);
-      el.setAttribute('stroke-width', 1);
-      el.setAttribute('stroke-opacity', 0.6);
-      svg.appendChild(el);
-    }
-  }
-  else if(strokeStyle === 'marker'){
-    var strokes = 2;
-    for(var s=0; s<strokes; s++){
-      var el = document.createElementNS('http://www.w3.org/2000/svg','ellipse');
-      el.setAttribute('cx', cx);
-      el.setAttribute('cy', cy);
-      el.setAttribute('rx', rx + s);
-      el.setAttribute('ry', ry + s);
-      el.setAttribute('fill', 'none');
-      el.setAttribute('stroke', color);
-      el.setAttribute('stroke-width', 3);
-      el.setAttribute('stroke-opacity', 0.3);
-      svg.appendChild(el);
-    }
   }
 }
 
 function brushHighlight(sp, color){
-  if(strokeStyle === 'ink'){
-    sp.style.background = hexAlpha(color, 0.2);
-    sp.style.borderRadius = '2px';
-  }
-  else if(strokeStyle === 'brush'){
-    var layers = 3;
-    for(var i=0; i<layers; i++){
-      var layer = document.createElement('span');
-      layer.style.position = 'absolute';
-      layer.style.left = '-2px';
-      layer.style.right = '-2px';
-      layer.style.top = '-1px';
-      layer.style.bottom = '-1px';
-      layer.style.background = hexAlpha(color, 0.12 + i * 0.06);
-      layer.style.borderRadius = (2 + i) + 'px';
-      layer.style.filter = 'blur(' + (i * 0.5) + 'px)';
-      layer.style.zIndex = '-1';
-      sp.style.position = 'relative';
-      sp.insertBefore(layer, sp.firstChild);
-    }
-  }
-  else if(strokeStyle === 'pencil'){
-    var grayColor = toGrayscale(color);
-    sp.style.background = hexAlpha(grayColor, 0.15);
-    sp.style.borderRadius = '1px';
-  }
-  else if(strokeStyle === 'marker'){
-    var layers = 2;
-    for(var i=0; i<layers; i++){
-      var layer = document.createElement('span');
-      layer.style.position = 'absolute';
-      layer.style.left = '-3px';
-      layer.style.right = '-3px';
-      layer.style.top = '-2px';
-      layer.style.bottom = '-2px';
-      layer.style.background = hexAlpha(color, 0.25);
-      layer.style.borderRadius = '3px';
-      layer.style.zIndex = '-1';
-      sp.style.position = 'relative';
-      sp.insertBefore(layer, sp.firstChild);
-    }
+  // multi-layer watercolor wash
+  var layers = 3;
+  for(var i=0; i<layers; i++){
+    var layer = document.createElement('span');
+    layer.style.position = 'absolute';
+    layer.style.left = '-2px';
+    layer.style.right = '-2px';
+    layer.style.top = '-1px';
+    layer.style.bottom = '-1px';
+    layer.style.background = hexAlpha(color, 0.15 + i * 0.08);
+    layer.style.borderRadius = (2 + i) + 'px';
+    layer.style.filter = 'blur(' + (i * 0.5) + 'px)';
+    layer.style.zIndex = '-1';
+    sp.style.position = 'relative';
+    sp.insertBefore(layer, sp.firstChild);
   }
 }
 
 function brushStrike(sp, color){
-  if(strokeStyle === 'ink'){
+  // double strike with offset
+  var strikes = 2;
+  for(var i=0; i<strikes; i++){
     var line = document.createElement('span');
     line.style.position = 'absolute';
     line.style.left = '-2px';
@@ -587,88 +482,23 @@ function brushStrike(sp, color){
     line.style.top = '50%';
     line.style.height = '1.5px';
     line.style.background = color;
-    line.style.transform = 'translateY(-50%)';
-    line.style.opacity = '0.75';
-    line.style.pointerEvents = 'none';
-    sp.style.position = 'relative';
-    sp.appendChild(line);
-  }
-  else if(strokeStyle === 'brush'){
-    var strikes = 2;
-    for(var i=0; i<strikes; i++){
-      var line = document.createElement('span');
-      line.style.position = 'absolute';
-      line.style.left = '-2px';
-      line.style.right = '-2px';
-      line.style.top = '50%';
-      line.style.height = '1.5px';
-      line.style.background = color;
-      line.style.transform = 'translateY(-50%) rotate(' + ((Math.random() - 0.5) * 2) + 'deg)';
-      line.style.opacity = 0.5 + i * 0.2;
-      line.style.pointerEvents = 'none';
-      sp.style.position = 'relative';
-      sp.appendChild(line);
-    }
-  }
-  else if(strokeStyle === 'pencil'){
-    var grayColor = toGrayscale(color);
-    var line = document.createElement('span');
-    line.style.position = 'absolute';
-    line.style.left = '-2px';
-    line.style.right = '-2px';
-    line.style.top = '50%';
-    line.style.height = '1px';
-    line.style.background = grayColor;
-    line.style.transform = 'translateY(-50%)';
-    line.style.opacity = '0.6';
-    line.style.pointerEvents = 'none';
-    sp.style.position = 'relative';
-    sp.appendChild(line);
-  }
-  else if(strokeStyle === 'marker'){
-    var line = document.createElement('span');
-    line.style.position = 'absolute';
-    line.style.left = '-3px';
-    line.style.right = '-3px';
-    line.style.top = '50%';
-    line.style.height = '3px';
-    line.style.background = color;
-    line.style.transform = 'translateY(-50%)';
-    line.style.opacity = '0.5';
+    line.style.transform = 'translateY(-50%) rotate(' + ((Math.random() - 0.5) * 2) + 'deg)';
+    line.style.opacity = 0.6 + i * 0.2;
     line.style.pointerEvents = 'none';
     sp.style.position = 'relative';
     sp.appendChild(line);
   }
 }
 
-function ensureInkFilter(svg){
-  if(svg.querySelector('#ink-filter')) return;
-  var defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
-  var filter = document.createElementNS('http://www.w3.org/2000/svg','filter');
-  filter.setAttribute('id','ink-filter');
-  var turb = document.createElementNS('http://www.w3.org/2000/svg','feTurbulence');
-  turb.setAttribute('baseFrequency','0.05');
-  turb.setAttribute('numOctaves','2');
-  turb.setAttribute('result','turbulence');
-  var disp = document.createElementNS('http://www.w3.org/2000/svg','feDisplacementMap');
-  disp.setAttribute('in','SourceGraphic');
-  disp.setAttribute('in2','turbulence');
-  disp.setAttribute('scale','1');
-  filter.appendChild(turb);
-  filter.appendChild(disp);
-  defs.appendChild(filter);
-  svg.appendChild(defs);
-}
-
-function toGrayscale(hex){
-  var res = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if(!res) return '#666';
-  var r = parseInt(res[1],16);
-  var g = parseInt(res[2],16);
-  var b = parseInt(res[3],16);
-  var gray = Math.round(0.299*r + 0.587*g + 0.114*b);
-  var h = gray.toString(16).padStart(2,'0');
-  return '#'+h+h+h;
+function animateStroke(el){
+  if(!el || el.tagName !== 'circle') return;
+  el.style.opacity = '0';
+  el.style.transition = 'opacity 0.4s ease-out';
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      el.style.opacity = el.getAttribute('fill-opacity') || '1';
+    });
+  });
 }
 
 function markKeyword(kw){
@@ -693,7 +523,7 @@ function markKeyword(kw){
     matched.forEach(function(sp){ applyMarkToSpan(sp, tool, color); });
   }
 
-  keywords.push({word:kw, color:color, tool:tool, style:strokeStyle});
+  keywords.push({word:kw, color:color, tool:tool});
   renderTags();
 }
 
@@ -776,19 +606,19 @@ function renderTags(){
 }
 
 function bindEvents(){
-  document.querySelectorAll('.tool-btn[data-tool]').forEach(function(btn){
+  document.querySelectorAll('[data-tool]').forEach(function(btn){
     btn.addEventListener('click',function(){
-      document.querySelectorAll('.tool-btn[data-tool]').forEach(function(b){b.classList.remove('active');});
+      document.querySelectorAll('[data-tool]').forEach(function(b){b.classList.remove('active');});
       btn.classList.add('active');
       currentTool = btn.dataset.tool;
     });
   });
 
-  document.querySelectorAll('.tool-btn[data-style]').forEach(function(btn){
+  document.querySelectorAll('[data-brush]').forEach(function(btn){
     btn.addEventListener('click',function(){
-      document.querySelectorAll('.tool-btn[data-style]').forEach(function(b){b.classList.remove('active');});
+      document.querySelectorAll('[data-brush]').forEach(function(b){b.classList.remove('active');});
       btn.classList.add('active');
-      strokeStyle = btn.dataset.style;
+      brushMode = btn.dataset.brush;
     });
   });
 
