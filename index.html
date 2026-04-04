@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Mark It ✦</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500&family=IM+Fell+English:ital@0;1&family=Special+Elite&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f0e8;--paper:#faf6ee;--ink:#1a1410;--muted:#7a6e60;
+  --border:#d8cfc0;--accent:#2a2a2a;--header-h:48px;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);font-family:'Outfit',sans-serif;font-size:13px;color:var(--ink)}
+
+/* HEADER */
+header{
+  height:var(--header-h);background:var(--paper);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0;z-index:100;position:relative;
+}
+.brand{font-family:'Special Elite',monospace;font-size:16px;letter-spacing:.04em;color:var(--ink)}
+.brand span{color:#c0392b}
+.sep{flex:1}
+.btn{height:30px;border:1px solid var(--border);background:transparent;border-radius:4px;
+  cursor:pointer;color:var(--ink);font-family:inherit;font-size:12px;padding:0 12px;
+  transition:border-color .15s,color .15s;letter-spacing:.04em}
+.btn:hover{border-color:var(--ink);color:var(--ink)}
+.btn.danger{border-color:#c0392b;color:#c0392b}
+.btn.danger:hover{background:#c0392b;color:#fff}
+
+/* LAYOUT */
+#layout{display:flex;flex:1;height:calc(100vh - var(--header-h));overflow:hidden}
+
+/* PANEL */
+#panel{
+  width:240px;flex-shrink:0;background:var(--paper);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;padding:16px 14px;gap:14px;overflow-y:auto;
+}
+.ps-t{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;font-weight:500}
+.tool-btn{
+  width:100%;height:32px;border:1px solid var(--border);background:transparent;
+  border-radius:4px;cursor:pointer;font-family:'Special Elite',monospace;font-size:12px;
+  color:var(--muted);letter-spacing:.04em;transition:all .15s;display:flex;align-items:center;
+  justify-content:center;gap:6px;
+}
+.tool-btn:hover{border-color:var(--ink);color:var(--ink)}
+.tool-btn.active{border-color:var(--ink);color:var(--ink);background:rgba(26,20,16,.06)}
+.color-row{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px}
+.color-dot{
+  width:18px;height:18px;border-radius:50%;cursor:pointer;border:2px solid transparent;
+  transition:border-color .15s;flex-shrink:0;
+}
+.color-dot.active{border-color:var(--ink)}
+.row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-bottom:6px}
+.row>span{width:64px;flex-shrink:0;color:var(--ink)}
+input[type=range]{flex:1;accent-color:#c0392b;height:3px}
+.val{width:22px;text-align:right;flex-shrink:0;color:var(--muted)}
+
+/* KEYWORD INPUT */
+#kw-area{display:flex;flex-direction:column;gap:0}
+#kw-input{
+  width:100%;border:1px solid var(--border);background:var(--bg);
+  color:var(--ink);border-radius:4px;padding:6px 10px;font-family:'Special Elite',monospace;
+  font-size:13px;letter-spacing:.06em;outline:none;transition:border-color .15s;
+}
+#kw-input:focus{border-color:var(--ink)}
+#kw-input::placeholder{color:var(--muted);font-family:'Outfit',sans-serif;font-size:11px;letter-spacing:.02em}
+#kw-hint{font-size:10px;color:var(--muted);margin-top:5px;line-height:1.5}
+#kw-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.kw-tag{
+  font-family:'Special Elite',monospace;font-size:11px;padding:2px 8px;
+  border-radius:3px;border:1px solid;cursor:pointer;letter-spacing:.04em;
+  display:flex;align-items:center;gap:4px;
+}
+.kw-tag .rm{font-size:9px;opacity:.5}
+.kw-tag:hover .rm{opacity:1}
+
+/* CANVAS WRAP */
+#canvas-wrap{
+  flex:1;overflow:auto;display:flex;justify-content:center;align-items:flex-start;
+  padding:32px;background:var(--bg);
+  background-image:
+    linear-gradient(rgba(0,0,0,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,.04) 1px, transparent 1px);
+  background-size:24px 24px;
+}
+
+/* PAPER */
+#paper{
+  position:relative;
+  width:720px;min-height:960px;
+  background:var(--paper);
+  box-shadow:0 4px 24px rgba(0,0,0,.12), 0 1px 4px rgba(0,0,0,.08);
+  padding:48px 56px 56px;
+  /* subtle paper texture via repeating gradient */
+  background-image:
+    repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(180,160,120,.08) 27px, rgba(180,160,120,.08) 28px);
+}
+/* red margin line */
+#paper::before{
+  content:'';position:absolute;left:72px;top:0;bottom:0;
+  border-left:1px solid rgba(192,57,43,.25);pointer-events:none;
+}
+
+/* TEXT CONTENT */
+#text-layer{
+  position:relative;z-index:1;
+  font-family:'IM Fell English',serif;
+  line-height:1.65;
+  user-select:none;
+}
+.word-span{
+  display:inline;position:relative;cursor:default;
+  font-size:13.5px;
+  transition:color .15s;
+}
+.word-span.matched{color:inherit}
+.word-space{display:inline;white-space:pre}
+
+/* MARK EFFECTS */
+.mark-highlight{
+  background:rgba(255,220,50,.45);
+  border-radius:1px;
+  padding:0 1px;
+}
+.mark-redact{
+  background:#1a1410;
+  color:transparent;
+  padding:0 2px;
+  border-radius:1px;
+  position:relative;
+}
+.mark-strike{
+  position:relative;
+}
+.mark-strike::after{
+  content:'';position:absolute;left:-1px;right:-1px;
+  top:50%;height:1.5px;
+  background:#c0392b;
+  transform:rotate(-0.5deg);
+  pointer-events:none;
+}
+.mark-circle{
+  position:relative;
+  z-index:2;
+}
+
+/* SVG OVERLAY */
+#svg-overlay{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  pointer-events:none;z-index:10;overflow:visible;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">Mark<span>It</span> ✦</div>
+  <div class="sep"></div>
+  <button class="btn" id="btn-clear-marks">Clear marks</button>
+  <button class="btn" id="btn-load-text">Load text</button>
+  <button class="btn" id="btn-export">↓ PNG</button>
+</header>
+
+<div id="layout">
+
+  <!-- PANEL -->
+  <div id="panel">
+
+    <div>
+      <div class="ps-t">Mark type</div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <button class="tool-btn active" data-tool="line">— connect with line</button>
+        <button class="tool-btn" data-tool="highlight">◼ highlight</button>
+        <button class="tool-btn" data-tool="redact">█ redact</button>
+        <button class="tool-btn" data-tool="strike">⟵ strikethrough</button>
+        <button class="tool-btn" data-tool="circle">○ circle</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="ps-t">Line color</div>
+      <div class="color-row" id="color-row"></div>
+    </div>
+
+    <div>
+      <div class="ps-t">Line weight</div>
+      <div class="row">
+        <span>Width</span>
+        <input type="range" id="sl-lw" min="1" max="5" step=".5" value="1.5">
+        <span class="val" id="vl-lw">1.5</span>
+      </div>
+      <div class="row">
+        <span>Opacity</span>
+        <input type="range" id="sl-op" min="0.2" max="1" step=".05" value="0.75">
+        <span class="val" id="vl-op">.75</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="ps-t">Keyword</div>
+      <div id="kw-area">
+        <input type="text" id="kw-input" placeholder="type a word, press Enter…" autocomplete="off" spellcheck="false"/>
+        <div id="kw-hint">Press <strong>Enter</strong> to mark all matches in the text.</div>
+        <div id="kw-tags"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="ps-t">Text</div>
+      <textarea id="txt-input" style="width:100%;height:120px;background:var(--bg);color:var(--ink);border:1px solid var(--border);border-radius:4px;padding:8px;font-family:'IM Fell English',serif;font-size:12px;resize:vertical;outline:none;line-height:1.6" placeholder="Paste your text here…"></textarea>
+      <button class="btn" style="margin-top:6px;width:100%" id="btn-apply-text">Apply text</button>
+    </div>
+
+  </div>
+
+  <!-- CANVAS WRAP -->
+  <div id="canvas-wrap">
+    <div id="paper">
+      <div id="text-layer"></div>
+      <svg id="svg-overlay"></svg>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Default text ──
+var DEFAULT_TEXT = `The relationship between language and thought has occupied philosophers since antiquity. Wittgenstein argued that the limits of one's language are the limits of one's world — a proposition that inverts the ordinary assumption that thought precedes expression.
+
+Benjamin's concept of aura — that quality of presence, of unrepeatable occurrence — erodes in the age of mechanical reproduction. Yet the copy proliferates meaning even as it evacuates the original.
+
+Memory is not storage but reconstruction. Each recollection is a new act, shaped by intervening experience, desire, and the present moment's demands. The archive is always already interpretation.
+
+Barthes distinguishes the studium from the punctum: the former a cultural, coded field of interest; the latter a wound, a prick — the accidental detail that pierces the reader of the image.
+
+In topology, a surface may be transformed continuously without tearing. The coffee cup and the donut are the same. Form is preserved through deformation. Identity survives distortion.
+
+Language game, form of life, family resemblance. Ordinary language philosophy insists that meaning is use — not reference, not mental image, but participation in shared practice.
+
+The archive speaks only to those who already know what they are looking for. The document does not answer; it waits. History is the art of asking the right question.
+
+Rhizome versus tree. The arboreal structure presupposes a root, a foundation, a hierarchy of branches. The rhizome spreads laterally, without center, without origin — multiplicities without unity.`;
+
+// ── State ──
+var currentTool = 'line';
+var currentColor = '#c0392b';
+var lineWidth = 1.5;
+var lineOpacity = 0.75;
+var keywords = []; // {word, color, tool}
+var wordSpans = []; // DOM spans
+var marks = []; // drawn marks {type, positions, color, lw, op}
+var animating = false;
+
+// ── Colors ──
+var COLORS = [
+  '#c0392b','#2980b9','#27ae60','#8e44ad',
+  '#e67e22','#16a085','#2c3e50','#7f8c8d',
+  '#f39c12','#1abc9c'
+];
+
+// ── Init ──
+function init(){
+  buildColorRow();
+  buildText(DEFAULT_TEXT);
+  document.getElementById('txt-input').value = DEFAULT_TEXT;
+  bindEvents();
+}
+
+function buildColorRow(){
+  var row = document.getElementById('color-row');
+  row.innerHTML = '';
+  COLORS.forEach(function(c){
+    var d = document.createElement('div');
+    d.className = 'color-dot' + (c===currentColor?' active':'');
+    d.style.background = c;
+    d.addEventListener('click', function(){
+      currentColor = c;
+      row.querySelectorAll('.color-dot').forEach(function(x){x.classList.remove('active');});
+      d.classList.add('active');
+    });
+    row.appendChild(d);
+  });
+}
+
+// ── Build text ──
+function buildText(text){
+  var layer = document.getElementById('text-layer');
+  layer.innerHTML = '';
+  wordSpans = [];
+
+  var paragraphs = text.split(/\n+/);
+  paragraphs.forEach(function(para, pi){
+    if(!para.trim()) return;
+    var p = document.createElement('p');
+    p.style.marginBottom = (pi < paragraphs.length-1) ? '22px' : '0';
+    // vary font size slightly per paragraph for "notes" feel
+    var sizes = [13, 13.5, 12.5, 14, 13, 12, 13.5, 14];
+    p.style.fontSize = (sizes[pi % sizes.length]) + 'px';
+    // slight rotation on some paragraphs
+    if(pi % 3 === 1) p.style.transform = 'rotate(-0.15deg)';
+    if(pi % 5 === 3) p.style.transform = 'rotate(0.1deg)';
+
+    var tokens = para.split(/(\s+)/);
+    tokens.forEach(function(tok){
+      if(/^\s+$/.test(tok)){
+        var sp = document.createElement('span');
+        sp.className = 'word-space';
+        sp.textContent = tok;
+        p.appendChild(sp);
+      } else {
+        // split on punctuation boundaries but keep them
+        var parts = tok.split(/(?=[,\.;:!?—])|(?<=[,\.;:!?—])/);
+        parts.forEach(function(part){
+          if(!part) return;
+          var sp = document.createElement('span');
+          sp.className = 'word-span';
+          sp.textContent = part;
+          sp.dataset.word = part.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g,'').toLowerCase();
+          wordSpans.push(sp);
+          p.appendChild(sp);
+        });
+      }
+    });
+    layer.appendChild(p);
+  });
+}
+
+// ── Keyword matching ──
+function markKeyword(kw){
+  var tool = currentTool;
+  var color = currentColor;
+  var lw = lineWidth;
+  var op = lineOpacity;
+
+  var word = kw.toLowerCase().trim();
+  if(!word) return;
+
+  // find matching spans
+  var matched = wordSpans.filter(function(sp){
+    return sp.dataset.word === word || sp.dataset.word.includes(word) || word.includes(sp.dataset.word) && sp.dataset.word.length > 2;
+  });
+  if(!matched.length) return;
+
+  if(tool === 'line'){
+    // connect matched spans with animated bezier lines
+    applyLineConnections(matched, color, lw, op);
+  } else {
+    matched.forEach(function(sp){
+      applyMarkToSpan(sp, tool, color);
+    });
+  }
+
+  // add to keyword tags
+  keywords.push({word:kw, color:color, tool:tool});
+  renderTags();
+}
+
+function applyMarkToSpan(sp, tool, color){
+  // remove existing mark classes
+  sp.classList.remove('mark-highlight','mark-redact','mark-strike','mark-circle');
+  if(tool === 'highlight'){
+    sp.classList.add('mark-highlight');
+    sp.style.background = hexAlpha(color, 0.4);
+  } else if(tool === 'redact'){
+    sp.classList.add('mark-redact');
+  } else if(tool === 'strike'){
+    sp.classList.add('mark-strike');
+    sp.style.setProperty('--strike-color', color);
+    // override the ::after color via inline style workaround
+    sp.style.textDecoration = 'line-through';
+    sp.style.textDecorationColor = color;
+    sp.style.textDecorationThickness = '1.5px';
+  } else if(tool === 'circle'){
+    sp.classList.add('mark-circle');
+    drawCircleAroundSpan(sp, color);
+  }
+}
+
+// ── SVG line connections ──
+function applyLineConnections(spans, color, lw, op){
+  if(spans.length < 2) return;
+  var paper = document.getElementById('paper');
+  var svg = document.getElementById('svg-overlay');
+  var paperRect = paper.getBoundingClientRect();
+
+  // get center of each span relative to paper
+  var pts = spans.map(function(sp){
+    var r = sp.getBoundingClientRect();
+    return {
+      x: r.left - paperRect.left + r.width/2,
+      y: r.top - paperRect.top + r.height/2,
+      sp: sp
+    };
+  });
+
+  // highlight the matched spans lightly
+  spans.forEach(function(sp){
+    sp.style.background = hexAlpha(color, 0.15);
+    sp.style.borderRadius = '2px';
+    sp.style.padding = '0 1px';
+  });
+
+  // draw path connecting them with bezier curves
+  animatePath(svg, pts, color, lw, op);
+}
+
+function animatePath(svg, pts, color, lw, op){
+  if(pts.length < 2) return;
+
+  // build a smooth path through all points
+  var d = buildSmoothPath(pts);
+
+  var path = document.createElementNS('http://www.w3.org/2000/svg','path');
+  path.setAttribute('d', d);
+  path.setAttribute('fill','none');
+  path.setAttribute('stroke', color);
+  path.setAttribute('stroke-width', lw);
+  path.setAttribute('stroke-opacity', op);
+  path.setAttribute('stroke-linecap','round');
+  path.setAttribute('stroke-linejoin','round');
+
+  // slight hand-drawn wobble: use filter
+  var filterId = 'wobble-' + Date.now();
+  var defs = svg.querySelector('defs') || svg.insertBefore(document.createElementNS('http://www.w3.org/2000/svg','defs'), svg.firstChild);
+  var filt = document.createElementNS('http://www.w3.org/2000/svg','filter');
+  filt.setAttribute('id', filterId);
+  filt.setAttribute('x','-5%');filt.setAttribute('y','-5%');
+  filt.setAttribute('width','110%');filt.setAttribute('height','110%');
+  var turb = document.createElementNS('http://www.w3.org/2000/svg','feTurbulence');
+  turb.setAttribute('type','turbulence');
+  turb.setAttribute('baseFrequency','0.05');
+  turb.setAttribute('numOctaves','2');
+  turb.setAttribute('result','noise');
+  var disp = document.createElementNS('http://www.w3.org/2000/svg','feDisplacementMap');
+  disp.setAttribute('in','SourceGraphic');
+  disp.setAttribute('in2','noise');
+  disp.setAttribute('scale','1.5');
+  disp.setAttribute('xChannelSelector','R');
+  disp.setAttribute('yChannelSelector','G');
+  filt.appendChild(turb);
+  filt.appendChild(disp);
+  defs.appendChild(filt);
+  path.setAttribute('filter','url(#'+filterId+')');
+
+  svg.appendChild(path);
+
+  // animate draw-on
+  var length = path.getTotalLength();
+  path.style.strokeDasharray = length;
+  path.style.strokeDashoffset = length;
+  path.style.transition = 'none';
+
+  // small dots at each matched word
+  pts.forEach(function(pt){
+    var dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    dot.setAttribute('cx', pt.x);
+    dot.setAttribute('cy', pt.y);
+    dot.setAttribute('r', lw * 2.5);
+    dot.setAttribute('fill', color);
+    dot.setAttribute('fill-opacity', op);
+    svg.appendChild(dot);
+  });
+
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      var dur = Math.min(1800, 600 + length * 0.8);
+      path.style.transition = 'stroke-dashoffset ' + dur + 'ms cubic-bezier(0.4,0,0.2,1)';
+      path.style.strokeDashoffset = 0;
+    });
+  });
+}
+
+function buildSmoothPath(pts){
+  if(pts.length === 2){
+    // single bezier with slight arc
+    var p0 = pts[0], p1 = pts[1];
+    var dx = p1.x - p0.x, dy = p1.y - p0.y;
+    var mx = (p0.x+p1.x)/2 + dy*0.25 + (Math.random()-.5)*30;
+    var my = (p0.y+p1.y)/2 - dx*0.25 + (Math.random()-.5)*20;
+    return 'M'+r(p0.x)+','+r(p0.y)+' Q'+r(mx)+','+r(my)+' '+r(p1.x)+','+r(p1.y);
+  }
+  // catmull-rom → bezier for multiple points
+  var d = 'M'+r(pts[0].x)+','+r(pts[0].y);
+  for(var i=0;i<pts.length-1;i++){
+    var p0 = pts[Math.max(0,i-1)];
+    var p1 = pts[i];
+    var p2 = pts[i+1];
+    var p3 = pts[Math.min(pts.length-1,i+2)];
+    var cp1x = p1.x + (p2.x-p0.x)/6;
+    var cp1y = p1.y + (p2.y-p0.y)/6;
+    var cp2x = p2.x - (p3.x-p1.x)/6;
+    var cp2y = p2.y - (p3.y-p1.y)/6;
+    // add tiny random wobble
+    cp1x += (Math.random()-.5)*8; cp1y += (Math.random()-.5)*8;
+    cp2x += (Math.random()-.5)*8; cp2y += (Math.random()-.5)*8;
+    d += ' C'+r(cp1x)+','+r(cp1y)+' '+r(cp2x)+','+r(cp2y)+' '+r(p2.x)+','+r(p2.y);
+  }
+  return d;
+}
+
+function drawCircleAroundSpan(sp, color){
+  var paper = document.getElementById('paper');
+  var svg = document.getElementById('svg-overlay');
+  var paperRect = paper.getBoundingClientRect();
+  var r2 = sp.getBoundingClientRect();
+  var cx = r2.left - paperRect.left + r2.width/2;
+  var cy = r2.top - paperRect.top + r2.height/2;
+  var rx = r2.width/2 + 6;
+  var ry = r2.height/2 + 5;
+
+  // hand-drawn ellipse via path
+  var path = document.createElementNS('http://www.w3.org/2000/svg','ellipse');
+  path.setAttribute('cx', cx);
+  path.setAttribute('cy', cy);
+  path.setAttribute('rx', rx);
+  path.setAttribute('ry', ry);
+  path.setAttribute('fill','none');
+  path.setAttribute('stroke',color);
+  path.setAttribute('stroke-width','1.5');
+  path.setAttribute('stroke-opacity','0.8');
+  path.setAttribute('transform','rotate('+(Math.random()*6-3)+','+cx+','+cy+')');
+  svg.appendChild(path);
+}
+
+// ── Tags ──
+function renderTags(){
+  var c = document.getElementById('kw-tags');
+  c.innerHTML = '';
+  keywords.forEach(function(kw, i){
+    var tag = document.createElement('div');
+    tag.className = 'kw-tag';
+    tag.style.borderColor = kw.color;
+    tag.style.color = kw.color;
+    tag.innerHTML = kw.word + ' <span class="rm">✕</span>';
+    tag.addEventListener('click', function(){
+      keywords.splice(i,1);
+      renderTags();
+    });
+    c.appendChild(tag);
+  });
+}
+
+// ── Events ──
+function bindEvents(){
+  // tool buttons
+  document.querySelectorAll('.tool-btn').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.remove('active');});
+      btn.classList.add('active');
+      currentTool = btn.dataset.tool;
+    });
+  });
+
+  // sliders
+  var slLw = document.getElementById('sl-lw');
+  var vlLw = document.getElementById('vl-lw');
+  slLw.addEventListener('input',function(){
+    lineWidth = parseFloat(slLw.value);
+    vlLw.textContent = lineWidth;
+  });
+  var slOp = document.getElementById('sl-op');
+  var vlOp = document.getElementById('vl-op');
+  slOp.addEventListener('input',function(){
+    lineOpacity = parseFloat(slOp.value);
+    vlOp.textContent = lineOpacity.toFixed(2);
+  });
+
+  // keyword input
+  var kwin = document.getElementById('kw-input');
+  kwin.addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){
+      e.preventDefault();
+      var val = kwin.value.trim();
+      if(val){
+        markKeyword(val);
+        kwin.value = '';
+      }
+    }
+  });
+
+  // clear marks
+  document.getElementById('btn-clear-marks').addEventListener('click', function(){
+    // remove svg children except defs
+    var svg = document.getElementById('svg-overlay');
+    while(svg.lastChild) svg.removeChild(svg.lastChild);
+    // remove span marks
+    wordSpans.forEach(function(sp){
+      sp.classList.remove('mark-highlight','mark-redact','mark-strike','mark-circle');
+      sp.style.background = '';
+      sp.style.textDecoration = '';
+      sp.style.padding = '';
+      sp.style.borderRadius = '';
+      sp.style.color = '';
+    });
+    keywords = [];
+    renderTags();
+  });
+
+  // load text
+  document.getElementById('btn-load-text').addEventListener('click', function(){
+    var txt = document.getElementById('txt-input').value.trim();
+    if(txt) buildText(txt);
+  });
+  document.getElementById('btn-apply-text').addEventListener('click', function(){
+    var txt = document.getElementById('txt-input').value.trim();
+    if(txt) buildText(txt);
+  });
+
+  // export PNG
+  document.getElementById('btn-export').addEventListener('click', exportPNG);
+}
+
+// ── Export ──
+function exportPNG(){
+  var paper = document.getElementById('paper');
+  // html2canvas-lite approach: open paper in new window for now
+  // TODO: implement proper canvas export
+  alert('Export coming soon — try screenshotting for now!');
+}
+
+// ── Helpers ──
+function r(n){ return Math.round(n*10)/10; }
+function hexAlpha(hex, alpha){
+  var res = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if(!res) return hex;
+  return 'rgba('+parseInt(res[1],16)+','+parseInt(res[2],16)+','+parseInt(res[3],16)+','+alpha+')';
+}
+
+init();
+</script>
+</body>
+</html>
