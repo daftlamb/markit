@@ -230,8 +230,11 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
   </div>
   <button class="btn" id="btn-toggle-scroll">⏸ Stop</button>
   <button class="btn" id="btn-clear-marks">Clear marks</button>
-  <button class="btn" id="btn-export">↓ PNG</button>
+  <button class="btn" id="btn-export">↓ PDF</button>
 </header>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <div id="layout">
 
@@ -254,6 +257,7 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
         <button class="tool-btn" data-tool="highlight">◼ highlight</button>
         <button class="tool-btn" data-tool="redact">█ redact</button>
         <button class="tool-btn" data-tool="strike">⟵ strike</button>
+        <button class="tool-btn" data-tool="circle">○ circle</button>
       </div>
     </div>
 
@@ -290,6 +294,11 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
         <span>Opacity</span>
         <input type="range" id="sl-op" min="0.2" max="1" step=".05" value="0.75">
         <span class="val" id="vl-op">.75</span>
+      </div>
+      <div class="row">
+        <span>Tension</span>
+        <input type="range" id="sl-tension" min="0" max="1" step=".05" value="0.2">
+        <span class="val" id="vl-tension">.2</span>
       </div>
     </div>
 
@@ -337,6 +346,7 @@ var currentStyle = 'ink';
 var currentColor = '#c0392b';
 var lineWidth = 1.5;
 var lineOpacity = 0.75;
+var lineTension = 0.2; // 0=straight, 1=very loose/random
 var keywords = [];
 var allWordSpans = [];
 var paused = false;
@@ -553,19 +563,22 @@ function startScroll(){
 
 document.addEventListener('DOMContentLoaded', function(){
   var cw = document.getElementById('canvas-wrap');
+  var header = document.querySelector('header');
+  var panel = document.getElementById('panel');
   var scrollStopped = false;
   var isDragging = false;
   var dragStartX = 0;
   var dragStartOffset = 0;
   
+  // Pause when mouse is over header or panel, play when in canvas area
+  function onHeaderEnter(){ if(!scrollStopped) paused = true; }
+  function onHeaderLeave(){ if(!scrollStopped) paused = false; }
+  header.addEventListener('mouseenter', onHeaderEnter);
+  header.addEventListener('mouseleave', onHeaderLeave);
+  panel.addEventListener('mouseenter', onHeaderEnter);
+  panel.addEventListener('mouseleave', onHeaderLeave);
+
   if(cw){
-    cw.addEventListener('mouseenter', function(){ 
-      if(!scrollStopped) paused = true; 
-    });
-    cw.addEventListener('mouseleave', function(){ 
-      if(!scrollStopped) paused = false; 
-    });
-    
     // Drag when stopped
     cw.addEventListener('mousedown', function(e){
       if(!scrollStopped) return;
@@ -661,7 +674,11 @@ function markKeyword(kw){
   if(!matched.length) return;
   if(tool === 'line'){
     groupByPaper(matched).forEach(function(group){
-      if(group.length >= 2) drawLineConnections(group, color, lw, op, style);
+      if(group.length >= 2) drawLineConnections(group, color, lw, op, style, lineTension);
+    });
+  } else if(tool === 'circle'){
+    groupByPaper(matched).forEach(function(group){
+      if(group.length >= 1) drawCircleMark(group, color, lw, op, style, lineTension);
     });
   } else {
     matched.forEach(function(sp){ applyMarkToSpan(sp, tool, color); });
@@ -701,15 +718,190 @@ function redrawCanvas(canvas){
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   var lines = canvasLines.get(canvas) || [];
   lines.forEach(function(line){
-    if(line.style === 'ink') drawInkLine(ctx, line.pts, line.color, line.lw, line.op);
-    else if(line.style === 'brush') drawBrushLine(ctx, line.pts, line.color, line.lw, line.op);
-    else if(line.style === 'pencil') drawPencilLine(ctx, line.pts, line.color, line.lw, line.op);
-    else if(line.style === 'marker') drawMarkerLine(ctx, line.pts, line.color, line.lw, line.op);
+    var t = line.tension !== undefined ? line.tension : 0.2;
+    if(line.type === 'circle'){
+      drawRoughEllipse(ctx, line.cx, line.cy, line.rx, line.ry, line.color, line.lw, line.op, t, line.seed);
+    } else if(line.style === 'ink') drawInkLine(ctx, line.pts, line.color, line.lw, line.op, t);
+    else if(line.style === 'brush') drawBrushLine(ctx, line.pts, line.color, line.lw, line.op, t);
+    else if(line.style === 'pencil') drawPencilLine(ctx, line.pts, line.color, line.lw, line.op, t);
+    else if(line.style === 'marker') drawMarkerLine(ctx, line.pts, line.color, line.lw, line.op, t);
   });
 }
 
-function drawLineConnections(spans, color, lw, op, style){
+// Draw a hand-drawn smooth ellipse — bezier with subtle wobble on control points
+function drawRoughEllipse(ctx, cx, cy, rx, ry, color, lw, op, tension, seed){
+  var rng = (function(s){ return function(){ s = (s*9301+49297)%233280; return s/233280; }; })(seed || 42);
+  // Subtle wobble: max 4px regardless of tension (tension only affects line style, not shape here)
+  var wobble = 3 + tension * 4;
+  // Use 4 bezier segments to draw ellipse (standard kappa = 0.5523)
+  var k = 0.5523;
+  ctx.globalAlpha = op;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lw;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  // top → right → bottom → left → top
+  var pts = [
+    [cx,      cy - ry], // top
+    [cx + rx, cy      ], // right
+    [cx,      cy + ry], // bottom
+    [cx - rx, cy      ], // left
+  ];
+  function w(){ return (rng()-0.5)*wobble*2; }
+  ctx.moveTo(pts[0][0]+w(), pts[0][1]+w());
+  // top to right
+  ctx.bezierCurveTo(
+    cx + rx*k + w(), cy - ry   + w(),
+    cx + rx   + w(), cy - ry*k + w(),
+    pts[1][0]+w(), pts[1][1]+w()
+  );
+  // right to bottom
+  ctx.bezierCurveTo(
+    cx + rx   + w(), cy + ry*k + w(),
+    cx + rx*k + w(), cy + ry   + w(),
+    pts[2][0]+w(), pts[2][1]+w()
+  );
+  // bottom to left
+  ctx.bezierCurveTo(
+    cx - rx*k + w(), cy + ry   + w(),
+    cx - rx   + w(), cy + ry*k + w(),
+    pts[3][0]+w(), pts[3][1]+w()
+  );
+  // left to top
+  ctx.bezierCurveTo(
+    cx - rx   + w(), cy - ry*k + w(),
+    cx - rx*k + w(), cy - ry   + w(),
+    pts[0][0]+w(), pts[0][1]+w()
+  );
+  ctx.closePath();
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+function drawCircleMark(spans, color, lw, op, style, tension){
+  if(!spans.length) return;
+  var paper = spans[0].closest('.paper');
+  if(!paper) return;
+  var canvas = paper.querySelector('.canvas-overlay');
+  if(!canvas) return;
+
+  if(canvas.width !== paper.offsetWidth || canvas.height !== paper.offsetHeight){
+    canvas.width  = paper.offsetWidth;
+    canvas.height = paper.offsetHeight;
+  }
+
+  var ctx = canvas.getContext('2d');
+  var track = document.getElementById('scroll-track');
+  var trackRect = track.getBoundingClientRect();
+  var paperRect = paper.getBoundingClientRect();
+  var paperOffsetX = paperRect.left - trackRect.left;
+  var paperOffsetY = paperRect.top  - trackRect.top;
+
+  if(!canvasLines.has(canvas)) canvasLines.set(canvas, []);
+  var lines = canvasLines.get(canvas);
+
+  // Group consecutive spans (adjacent in DOM order) into word-groups
+  // so multi-char words like "本雅明" get one ellipse, not three
+  var groups = [];
+  var allSpansInPaper = Array.from(paper.querySelectorAll('.word-span'));
+  var inGroup = false;
+  var currentGroup = [];
+  spans.forEach(function(sp){
+    currentGroup.push(sp);
+  });
+  // Split into groups where spans are consecutive AND on the same line
+  var wordGroups = [];
+  var temp = [spans[0]];
+  for(var i = 1; i < spans.length; i++){
+    var prevIdx = allSpansInPaper.indexOf(spans[i-1]);
+    var currIdx = allSpansInPaper.indexOf(spans[i]);
+    var prevTop = spans[i-1].getBoundingClientRect().top;
+    var currTop = spans[i].getBoundingClientRect().top;
+    var sameLine = Math.abs(currTop - prevTop) < 8; // within 8px = same line
+    if(currIdx === prevIdx + 1 && sameLine){
+      temp.push(spans[i]);
+    } else {
+      wordGroups.push(temp);
+      temp = [spans[i]];
+    }
+  }
+  wordGroups.push(temp);
+
+  // Draw one ellipse per word-group, staggered
+  wordGroups.forEach(function(group, idx){
+    setTimeout(function(){
+      // Compute bounding box of this group
+      var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      group.forEach(function(sp){
+        var r = sp.getBoundingClientRect();
+        var x1 = (r.left - trackRect.left) - paperOffsetX;
+        var y1 = (r.top  - trackRect.top)  - paperOffsetY;
+        if(x1 < minX) minX = x1;
+        if(y1 < minY) minY = y1;
+        if(x1 + r.width  > maxX) maxX = x1 + r.width;
+        if(y1 + r.height > maxY) maxY = y1 + r.height;
+      });
+
+      var pad = 5 + lw;
+      var cx = (minX + maxX) / 2;
+      var cy = (minY + maxY) / 2;
+      var rx = (maxX - minX) / 2 + pad;
+      var ry = (maxY - minY) / 2 + pad + 2; // slightly taller
+      var seed = Math.floor(Math.random() * 9999);
+
+      var duration = 350;
+      var startTime = Date.now();
+
+      function animateOne(){
+        var elapsed = Date.now() - startTime;
+        var progress = Math.min(elapsed / duration, 1);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        lines.forEach(function(line){
+          var t = line.tension !== undefined ? line.tension : 0.2;
+          if(line.type === 'circle'){
+            drawRoughEllipse(ctx, line.cx, line.cy, line.rx, line.ry, line.color, line.lw, line.op, t, line.seed);
+          } else if(line.style === 'ink') drawInkLine(ctx, line.pts, line.color, line.lw, line.op, t);
+          else if(line.style === 'brush') drawBrushLine(ctx, line.pts, line.color, line.lw, line.op, t);
+          else if(line.style === 'pencil') drawPencilLine(ctx, line.pts, line.color, line.lw, line.op, t);
+          else if(line.style === 'marker') drawMarkerLine(ctx, line.pts, line.color, line.lw, line.op, t);
+        });
+
+        var rng2 = (function(s){ return function(){ s=(s*9301+49297)%233280; return s/233280; }; })(seed);
+        var wobble = 2 + (tension||0.2) * 3;
+        var steps = 48;
+        var visibleSteps = Math.ceil(steps * progress);
+        ctx.globalAlpha = op;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lw;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        for(var i = 0; i <= visibleSteps; i++){
+          var angle = (i / steps) * Math.PI * 2 - Math.PI / 2;
+          var x = cx + Math.cos(angle) * rx + (rng2()-0.5)*wobble;
+          var y = cy + Math.sin(angle) * ry + (rng2()-0.5)*wobble;
+          if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        if(progress >= 1) ctx.closePath();
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+
+        if(progress < 1){
+          requestAnimationFrame(animateOne);
+        } else {
+          lines.push({ type:'circle', cx:cx, cy:cy, rx:rx, ry:ry, color:color, lw:lw, op:op, tension:tension||0.2, seed:seed });
+        }
+      }
+      requestAnimationFrame(animateOne);
+    }, idx * 150);
+  });
+}
+
+function drawLineConnections(spans, color, lw, op, style, tension){
   if(spans.length < 2) return;
+  tension = tension !== undefined ? tension : 0.2;
   var paper = spans[0].closest('.paper');
   if(!paper) return;
   var canvas = paper.querySelector('.canvas-overlay');
@@ -722,11 +914,9 @@ function drawLineConnections(spans, color, lw, op, style){
 
   var ctx = canvas.getContext('2d');
 
-  // paper's position relative to track — stable even when off-screen
   var track = document.getElementById('scroll-track');
   var trackRect = track.getBoundingClientRect();
   var paperRect = paper.getBoundingClientRect();
-  // paper's position relative to track (layout-stable, not viewport-dependent)
   var paperOffsetX = paperRect.left - trackRect.left;
   var paperOffsetY = paperRect.top  - trackRect.top;
 
@@ -737,7 +927,7 @@ function drawLineConnections(spans, color, lw, op, style){
       y: (r.top  - trackRect.top)  - paperOffsetY + r.height / 2
     };
   });
-  
+
   // Animate background highlight on spans
   spans.forEach(function(sp, idx){
     setTimeout(function(){
@@ -747,49 +937,44 @@ function drawLineConnections(spans, color, lw, op, style){
       sp.style.transition = 'background 0.3s ease';
     }, idx * 80);
   });
-  
-  // Animate new line drawing, keeping all previous lines intact
+
   var duration = 800;
   var startTime = Date.now();
-  
-  // Get or create line storage for this canvas
+
   if(!canvasLines.has(canvas)) canvasLines.set(canvas, []);
   var lines = canvasLines.get(canvas);
-  
+
   function animateLine(){
     var elapsed = Date.now() - startTime;
     var progress = Math.min(elapsed / duration, 1);
-    
-    // Redraw all completed previous lines
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     lines.forEach(function(line){
-      if(line.style === 'ink') drawInkLine(ctx, line.pts, line.color, line.lw, line.op);
-      else if(line.style === 'brush') drawBrushLine(ctx, line.pts, line.color, line.lw, line.op);
-      else if(line.style === 'pencil') drawPencilLine(ctx, line.pts, line.color, line.lw, line.op);
-      else if(line.style === 'marker') drawMarkerLine(ctx, line.pts, line.color, line.lw, line.op);
+      if(line.style === 'ink') drawInkLine(ctx, line.pts, line.color, line.lw, line.op, line.tension);
+      else if(line.style === 'brush') drawBrushLine(ctx, line.pts, line.color, line.lw, line.op, line.tension);
+      else if(line.style === 'pencil') drawPencilLine(ctx, line.pts, line.color, line.lw, line.op, line.tension);
+      else if(line.style === 'marker') drawMarkerLine(ctx, line.pts, line.color, line.lw, line.op, line.tension);
     });
-    
-    // Draw the new line at current progress
-    if(style === 'ink') drawInkLineAnimated(ctx, pts, color, lw, op, progress);
-    else if(style === 'brush') drawBrushLineAnimated(ctx, pts, color, lw, op, progress);
-    else if(style === 'pencil') drawPencilLineAnimated(ctx, pts, color, lw, op, progress);
-    else if(style === 'marker') drawMarkerLineAnimated(ctx, pts, color, lw, op, progress);
-    
+
+    if(style === 'ink') drawInkLineAnimated(ctx, pts, color, lw, op, progress, tension);
+    else if(style === 'brush') drawBrushLineAnimated(ctx, pts, color, lw, op, progress, tension);
+    else if(style === 'pencil') drawPencilLineAnimated(ctx, pts, color, lw, op, progress, tension);
+    else if(style === 'marker') drawMarkerLineAnimated(ctx, pts, color, lw, op, progress, tension);
+
     if(progress < 1){
       requestAnimationFrame(animateLine);
     } else {
-      // Animation done — store each segment (adjacent pair) as individual line
-      // so random color can target each segment independently
-      for(var i = 0; i < pts.length - 1; i++){
-        lines.push({ pts: [pts[i], pts[i+1]], color: color, lw: lw, op: op, style: style });
-      }
+      // Store full pts array so tension works across the whole path
+      lines.push({ pts: pts, color: color, lw: lw, op: op, style: style, tension: tension });
     }
   }
   
   requestAnimationFrame(animateLine);
 }
 
-function drawInkLineAnimated(ctx, pts, color, lw, op, progress){
+function drawInkLineAnimated(ctx, pts, color, lw, op, progress, tension){
+  tension = tension !== undefined ? tension : 0.2;
+  var jitter = tension * 80; // 0→0px straight, 1→80px very loose
   var totalPts = pts.length;
   var visiblePts = Math.ceil(totalPts * progress);
   var visiblePoints = pts.slice(0, visiblePts);
@@ -809,74 +994,92 @@ function drawInkLineAnimated(ctx, pts, color, lw, op, progress){
     var p2 = visiblePoints[i+1];
     var dx = p2.x - p1.x;
     var dy = p2.y - p1.y;
-    var cp1x = p1.x + dx * 0.25 + (Math.random()-.5)*5;
-    var cp1y = p1.y + dy * 0.25 + (Math.random()-.5)*5;
-    var cp2x = p1.x + dx * 0.75 + (Math.random()-.5)*5;
-    var cp2y = p1.y + dy * 0.75 + (Math.random()-.5)*5;
+    var cp1x = p1.x + dx * 0.25 + (Math.random()-.5)*jitter;
+    var cp1y = p1.y + dy * 0.25 + (Math.random()-.5)*jitter;
+    var cp2x = p1.x + dx * 0.75 + (Math.random()-.5)*jitter;
+    var cp2y = p1.y + dy * 0.75 + (Math.random()-.5)*jitter;
     ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
   }
   ctx.stroke();
   
-  visiblePoints.forEach(function(pt){
-    ctx.beginPath();
-    ctx.arc(pt.x, pt.y, lw*2, 0, Math.PI*2);
-    ctx.fillStyle = color;
-    ctx.fill();
-  });
+  if(tension > 0.05){
+    visiblePoints.forEach(function(pt){
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, lw*2, 0, Math.PI*2);
+      ctx.fillStyle = color;
+      ctx.fill();
+    });
+  }
 }
 
-function drawBrushLineAnimated(ctx, pts, color, lw, op, progress){
-  var totalPts = pts.length;
+function interpolatePts(pts, density){
+  // Insert extra points between each pair so brush/pencil effects have enough points to work with
+  var result = [];
+  for(var i = 0; i < pts.length - 1; i++){
+    var p1 = pts[i], p2 = pts[i+1];
+    var dist = Math.sqrt((p2.x-p1.x)*(p2.x-p1.x)+(p2.y-p1.y)*(p2.y-p1.y));
+    var steps = Math.max(2, Math.ceil(dist / density));
+    for(var j = 0; j < steps; j++){
+      var t = j / steps;
+      result.push({ x: p1.x + (p2.x-p1.x)*t, y: p1.y + (p2.y-p1.y)*t });
+    }
+  }
+  result.push(pts[pts.length-1]);
+  return result;
+}
+
+function drawBrushLineAnimated(ctx, pts, color, lw, op, progress, tension){
+  var interp = interpolatePts(pts, 6); // one point every 6px
+  var totalPts = interp.length;
   var visiblePts = Math.ceil(totalPts * progress);
-  var visiblePoints = pts.slice(0, visiblePts);
-  
+  var visiblePoints = interp.slice(0, visiblePts);
   if(visiblePoints.length < 2) return;
-  
-  var layers = 5;
-  for(var l=0;l<layers;l++){
-    ctx.globalAlpha = op / layers;
+
+  var layers = 6;
+  for(var l = 0; l < layers; l++){
+    ctx.globalAlpha = op / layers * 1.4;
     ctx.strokeStyle = color;
-    ctx.lineWidth = lw + Math.random()*0.8;
+    ctx.lineWidth = lw * (0.6 + Math.random() * 0.8);
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(visiblePoints[0].x + (Math.random()-.5)*2, visiblePoints[0].y + (Math.random()-.5)*2);
-    for(var i=1;i<visiblePoints.length;i++){
-      var p0 = visiblePoints[Math.max(0,i-1)];
+    ctx.moveTo(visiblePoints[0].x + (Math.random()-.5)*lw, visiblePoints[0].y + (Math.random()-.5)*lw);
+    for(var i = 1; i < visiblePoints.length; i++){
+      var p0 = visiblePoints[i-1];
       var p1 = visiblePoints[i];
-      var jx = (Math.random()-.5)*3;
-      var jy = (Math.random()-.5)*3;
+      var jx = (Math.random()-.5) * lw * 1.2;
+      var jy = (Math.random()-.5) * lw * 1.2;
       var cpx = (p0.x + p1.x)/2 + jx;
       var cpy = (p0.y + p1.y)/2 + jy;
-      ctx.quadraticCurveTo(p0.x+jx, p0.y+jy, cpx, cpy);
+      ctx.quadraticCurveTo(p0.x + jx*0.5, p0.y + jy*0.5, cpx, cpy);
     }
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
 }
 
-function drawPencilLineAnimated(ctx, pts, color, lw, op, progress){
-  var totalPts = pts.length;
+function drawPencilLineAnimated(ctx, pts, color, lw, op, progress, tension){
+  var interp = interpolatePts(pts, 4);
+  var totalPts = interp.length;
   var visiblePts = Math.ceil(totalPts * progress);
-  var visiblePoints = pts.slice(0, visiblePts);
-  
+  var visiblePoints = interp.slice(0, visiblePts);
   if(visiblePoints.length < 2) return;
-  
-  var layers = 8;
-  for(var l=0;l<layers;l++){
-    ctx.globalAlpha = op / (layers*1.5);
+
+  var layers = 10;
+  for(var l = 0; l < layers; l++){
+    ctx.globalAlpha = op / (layers * 1.2);
     ctx.strokeStyle = color;
-    ctx.lineWidth = lw * 0.6;
+    ctx.lineWidth = lw * 0.5;
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(visiblePoints[0].x + (Math.random()-.5)*1.5, visiblePoints[0].y + (Math.random()-.5)*1.5);
-    for(var i=1;i<visiblePoints.length;i++){
-      var p0 = visiblePoints[Math.max(0,i-1)];
+    ctx.moveTo(visiblePoints[0].x + (Math.random()-.5)*2, visiblePoints[0].y + (Math.random()-.5)*2);
+    for(var i = 1; i < visiblePoints.length; i++){
+      var p0 = visiblePoints[i-1];
       var p1 = visiblePoints[i];
-      var jx = (Math.random()-.5)*2;
-      var jy = (Math.random()-.5)*2;
-      var cpx = (p0.x + p1.x)/2 + jx;
-      var cpy = (p0.y + p1.y)/2 + jy;
-      ctx.quadraticCurveTo(p0.x+jx, p0.y+jy, cpx, cpy);
+      var jx = (Math.random()-.5)*2.5;
+      var jy = (Math.random()-.5)*2.5;
+      var cpx = (p0.x+p1.x)/2 + jx;
+      var cpy = (p0.y+p1.y)/2 + jy;
+      ctx.quadraticCurveTo(p0.x+jx*0.4, p0.y+jy*0.4, cpx, cpy);
     }
     ctx.stroke();
   }
@@ -904,7 +1107,9 @@ function drawMarkerLineAnimated(ctx, pts, color, lw, op, progress){
   ctx.globalAlpha = 1;
 }
 
-function drawInkLine(ctx, pts, color, lw, op){
+function drawInkLine(ctx, pts, color, lw, op, tension){
+  tension = tension !== undefined ? tension : 0.2;
+  var jitter = tension * 80;
   ctx.globalAlpha = op;
   ctx.strokeStyle = color;
   ctx.lineWidth = lw;
@@ -917,62 +1122,66 @@ function drawInkLine(ctx, pts, color, lw, op){
     var p1 = pts[i];
     var p2 = pts[i+1];
     var p3 = pts[Math.min(pts.length-1,i+2)];
-    var cp1x = p1.x + (p2.x-p0.x)/6 + (Math.random()-.5)*8;
-    var cp1y = p1.y + (p2.y-p0.y)/6 + (Math.random()-.5)*8;
-    var cp2x = p2.x - (p3.x-p1.x)/6 + (Math.random()-.5)*8;
-    var cp2y = p2.y - (p3.y-p1.y)/6 + (Math.random()-.5)*8;
+    var cp1x = p1.x + (p2.x-p0.x)/6 + (Math.random()-.5)*jitter;
+    var cp1y = p1.y + (p2.y-p0.y)/6 + (Math.random()-.5)*jitter;
+    var cp2x = p2.x - (p3.x-p1.x)/6 + (Math.random()-.5)*jitter;
+    var cp2y = p2.y - (p3.y-p1.y)/6 + (Math.random()-.5)*jitter;
     ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
   }
   ctx.stroke();
-  pts.forEach(function(pt){
-    ctx.beginPath();
-    ctx.arc(pt.x, pt.y, lw*2, 0, Math.PI*2);
-    ctx.fillStyle = color;
-    ctx.fill();
-  });
+  if(tension > 0.05){
+    pts.forEach(function(pt){
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, lw*2, 0, Math.PI*2);
+      ctx.fillStyle = color;
+      ctx.fill();
+    });
+  }
   ctx.globalAlpha = 1;
 }
 
-function drawBrushLine(ctx, pts, color, lw, op){
-  var layers = 5;
-  for(var l=0;l<layers;l++){
-    ctx.globalAlpha = op / layers;
+function drawBrushLine(ctx, pts, color, lw, op, tension){
+  var interp = interpolatePts(pts, 6);
+  var layers = 6;
+  for(var l = 0; l < layers; l++){
+    ctx.globalAlpha = op / layers * 1.4;
     ctx.strokeStyle = color;
-    ctx.lineWidth = lw + Math.random()*0.8;
+    ctx.lineWidth = lw * (0.6 + Math.random() * 0.8);
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(pts[0].x + (Math.random()-.5)*2, pts[0].y + (Math.random()-.5)*2);
-    for(var i=1;i<pts.length;i++){
-      var p0 = pts[Math.max(0,i-1)];
-      var p1 = pts[i];
-      var jx = (Math.random()-.5)*3;
-      var jy = (Math.random()-.5)*3;
+    ctx.moveTo(interp[0].x + (Math.random()-.5)*lw, interp[0].y + (Math.random()-.5)*lw);
+    for(var i = 1; i < interp.length; i++){
+      var p0 = interp[i-1];
+      var p1 = interp[i];
+      var jx = (Math.random()-.5) * lw * 1.2;
+      var jy = (Math.random()-.5) * lw * 1.2;
       var cpx = (p0.x + p1.x)/2 + jx;
       var cpy = (p0.y + p1.y)/2 + jy;
-      ctx.quadraticCurveTo(p0.x+jx, p0.y+jy, cpx, cpy);
+      ctx.quadraticCurveTo(p0.x + jx*0.5, p0.y + jy*0.5, cpx, cpy);
     }
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
 }
 
-function drawPencilLine(ctx, pts, color, lw, op){
-  var layers = 8;
-  for(var l=0;l<layers;l++){
-    ctx.globalAlpha = op / (layers*1.5);
+function drawPencilLine(ctx, pts, color, lw, op, tension){
+  var interp = interpolatePts(pts, 4);
+  var layers = 10;
+  for(var l = 0; l < layers; l++){
+    ctx.globalAlpha = op / (layers * 1.2);
     ctx.strokeStyle = color;
-    ctx.lineWidth = lw * 0.6;
+    ctx.lineWidth = lw * 0.5;
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(pts[0].x + (Math.random()-.5)*1.5, pts[0].y + (Math.random()-.5)*1.5);
-    for(var i=1;i<pts.length;i++){
-      var p0 = pts[Math.max(0,i-1)];
-      var p1 = pts[i];
-      var jx = (Math.random()-.5)*2;
-      var jy = (Math.random()-.5)*2;
-      var cpx = (p0.x + p1.x)/2 + jx;
-      var cpy = (p0.y + p1.y)/2 + jy;
-      ctx.quadraticCurveTo(p0.x+jx, p0.y+jy, cpx, cpy);
+    ctx.moveTo(interp[0].x + (Math.random()-.5)*2, interp[0].y + (Math.random()-.5)*2);
+    for(var i = 1; i < interp.length; i++){
+      var p0 = interp[i-1];
+      var p1 = interp[i];
+      var jx = (Math.random()-.5)*2.5;
+      var jy = (Math.random()-.5)*2.5;
+      var cpx = (p0.x+p1.x)/2 + jx;
+      var cpy = (p0.y+p1.y)/2 + jy;
+      ctx.quadraticCurveTo(p0.x+jx*0.4, p0.y+jy*0.4, cpx, cpy);
     }
     ctx.stroke();
   }
@@ -1012,16 +1221,18 @@ function renderTags(){
 }
 
 function bindEvents(){
-  document.querySelectorAll('.tool-btn').forEach(function(btn){
-    btn.addEventListener('click',function(){
-      document.querySelectorAll('.tool-btn').forEach(function(b){b.classList.remove('active');});
+  // Mark type buttons — only clear active within data-tool group
+  document.querySelectorAll('[data-tool]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('[data-tool]').forEach(function(b){ b.classList.remove('active'); });
       btn.classList.add('active');
       currentTool = btn.dataset.tool;
     });
   });
+  // Line style buttons — only clear active within data-style group
   document.querySelectorAll('[data-style]').forEach(function(btn){
-    btn.addEventListener('click',function(){
-      document.querySelectorAll('[data-style]').forEach(function(b){b.classList.remove('active');});
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('[data-style]').forEach(function(b){ b.classList.remove('active'); });
       btn.classList.add('active');
       currentStyle = btn.dataset.style;
     });
@@ -1037,6 +1248,12 @@ function bindEvents(){
   slOp.addEventListener('input',function(){
     lineOpacity = parseFloat(slOp.value);
     vlOp.textContent = lineOpacity.toFixed(2);
+  });
+  var slTension = document.getElementById('sl-tension');
+  var vlTension = document.getElementById('vl-tension');
+  slTension.addEventListener('input', function(){
+    lineTension = parseFloat(slTension.value);
+    vlTension.textContent = lineTension.toFixed(2);
   });
   var kwin = document.getElementById('kw-input');
   kwin.addEventListener('keydown', function(e){
@@ -1062,8 +1279,52 @@ function bindEvents(){
     keywords = [];
     renderTags();
   });
-  document.getElementById('btn-export').addEventListener('click', function(){
-    alert('Export coming soon!');
+  document.getElementById('btn-export').addEventListener('click', async function(){
+    var btn = this;
+    btn.textContent = '… generating';
+    btn.disabled = true;
+
+    try {
+      var { jsPDF } = window.jspdf;
+      // Paper size in points: 960×1358px at 96dpi → convert to mm (1px = 0.2646mm)
+      var pxToMm = 0.2646;
+      var paperW = 960 * pxToMm;
+      var paperH = 1358 * pxToMm;
+      var pdf = new jsPDF({ orientation:'portrait', unit:'mm', format:[paperW, paperH] });
+
+      // Only export the first PAGE_COUNT papers (not the duplicated scroll copies)
+      var allPapers = document.querySelectorAll('.paper');
+      var uniquePapers = Array.from(allPapers).slice(0, PAGE_COUNT);
+
+      for(var i = 0; i < uniquePapers.length; i++){
+        var paper = uniquePapers[i];
+        // Temporarily make paper visible at natural size for html2canvas
+        var origTransform = paper.style.transform;
+        paper.style.transform = 'none';
+
+        var canvas = await html2canvas(paper, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: null,
+          logging: false,
+        });
+
+        paper.style.transform = origTransform;
+
+        var imgData = canvas.toDataURL('image/jpeg', 0.92);
+        if(i > 0) pdf.addPage([paperW, paperH], 'portrait');
+        pdf.addImage(imgData, 'JPEG', 0, 0, paperW, paperH);
+      }
+
+      pdf.save('markit-export.pdf');
+    } catch(err){
+      console.error('PDF export failed:', err);
+      alert('Export failed: ' + err.message);
+    }
+
+    btn.textContent = '↓ PDF';
+    btn.disabled = false;
   });
   
   // Image insert
@@ -1091,7 +1352,7 @@ function bindEvents(){
       d.classList.toggle('active', d.dataset.color === randomColor);
     });
 
-    // 2. Randomize every stored line segment — each gets its own random color
+    // 2. Randomize every stored line/circle — each gets its own random color
     document.querySelectorAll('.canvas-overlay').forEach(function(canvas){
       var lines = canvasLines.get(canvas);
       if(!lines || !lines.length) return;
@@ -1268,38 +1529,109 @@ function insertImageIntoPaper(dataURL){
 function makeDraggable(el, imageId){
   var isDragging = false;
   var startX, startY, initialLeft, initialTop;
-  
+  var currentPaper = el.parentElement;
+  var dragSrc = el.querySelector('img') ? el.querySelector('img').src : '';
+
   el.addEventListener('mousedown', function(e){
     if(e.button !== 0) return;
     isDragging = true;
     startX = e.clientX;
     startY = e.clientY;
     initialLeft = parseInt(el.style.left) || 0;
-    initialTop = parseInt(el.style.top) || 0;
+    initialTop  = parseInt(el.style.top)  || 0;
+    currentPaper = el.parentElement;
+    dragSrc = el.querySelector('img') ? el.querySelector('img').src : dragSrc;
     el.style.cursor = 'grabbing';
     e.preventDefault();
-    e.stopPropagation(); // prevent canvas-wrap drag from firing
+    e.stopPropagation();
   });
-  
+
   document.addEventListener('mousemove', function(e){
     if(!isDragging) return;
     var dx = e.clientX - startX;
     var dy = e.clientY - startY;
-    var newLeft = (initialLeft + dx) + 'px';
-    var newTop  = (initialTop  + dy) + 'px';
-    document.querySelectorAll('.inserted-img[data-image-id="' + imageId + '"]').forEach(function(im){
-      im.style.left = newLeft;
-      im.style.top  = newTop;
-    });
+    var newLeft = initialLeft + dx;
+    var newTop  = initialTop  + dy;
+
+    // Check if mouse has moved over a different paper
+    var allPapers = Array.from(document.querySelectorAll('.paper'));
+    var hoveredPaper = null;
+    for(var i = 0; i < allPapers.length; i++){
+      var r = allPapers[i].getBoundingClientRect();
+      if(e.clientX >= r.left && e.clientX <= r.right &&
+         e.clientY >= r.top  && e.clientY <= r.bottom){
+        hoveredPaper = allPapers[i];
+        break;
+      }
+    }
+
+    if(hoveredPaper && hoveredPaper !== currentPaper){
+      // Migrate all same-id images to new paper positions
+      var oldRect = currentPaper.getBoundingClientRect();
+      var newRect = hoveredPaper.getBoundingClientRect();
+      // Offset = image position in old paper coords → new paper coords
+      var migratedLeft = newLeft + (oldRect.left - newRect.left);
+      var migratedTop  = newTop  + (oldRect.top  - newRect.top);
+
+      // Determine cycle index of hovered paper
+      var allPapersList = Array.from(document.querySelectorAll('.paper'));
+      var hoveredIdx = allPapersList.indexOf(hoveredPaper);
+      var newCycleIndex = hoveredIdx % PAGE_COUNT;
+
+      // Move all same-id images to hovered paper (and its cycle peers)
+      document.querySelectorAll('.inserted-img[data-image-id="' + imageId + '"]').forEach(function(im){
+        im.remove();
+      });
+
+      allPapersList.forEach(function(paper, idx){
+        if(idx % PAGE_COUNT === newCycleIndex){
+          var wrap = document.createElement('div');
+          wrap.className = 'inserted-img';
+          wrap.dataset.imageId = imageId;
+          wrap.dataset.cycleIndex = newCycleIndex;
+          wrap.style.left   = migratedLeft + 'px';
+          wrap.style.top    = migratedTop  + 'px';
+          wrap.style.width  = el.style.width;
+          wrap.style.height = el.style.height;
+          var img = document.createElement('img');
+          // find src from the element being dragged (el may have been removed, use closure)
+          img.src = dragSrc;
+          wrap.appendChild(img);
+          paper.appendChild(wrap);
+          makeDraggable(wrap, imageId);
+          wrap.addEventListener('contextmenu', function(ev){
+            ev.preventDefault();
+            document.querySelectorAll('.inserted-img[data-image-id="' + imageId + '"]').forEach(function(im){ im.remove(); });
+          });
+        }
+      });
+
+      // Update tracking vars so drag continues smoothly
+      currentPaper = hoveredPaper;
+      startX = e.clientX;
+      startY = e.clientY;
+      initialLeft = migratedLeft;
+      initialTop  = migratedTop;
+
+    } else {
+      // Normal same-paper drag — sync all peers
+      document.querySelectorAll('.inserted-img[data-image-id="' + imageId + '"]').forEach(function(im){
+        im.style.left = newLeft + 'px';
+        im.style.top  = newTop  + 'px';
+      });
+    }
   });
-  
+
   document.addEventListener('mouseup', function(){
     if(isDragging){
       isDragging = false;
-      el.style.cursor = 'move';
+      // el may have been replaced; just reset cursor on all same-id images
+      document.querySelectorAll('.inserted-img[data-image-id="' + imageId + '"]').forEach(function(im){
+        im.style.cursor = 'move';
+      });
     }
   });
-  
+
   el.addEventListener('wheel', function(e){
     e.preventDefault();
     var currentW = parseInt(el.style.width)  || 120;
