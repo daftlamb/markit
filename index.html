@@ -712,17 +712,33 @@ function drawLineConnections(spans, color, lw, op, style){
   if(spans.length < 2) return;
   var paper = spans[0].closest('.paper');
   var canvas = paper.querySelector('.canvas-overlay');
-  canvas.width = paper.offsetWidth;
-  canvas.height = paper.offsetHeight;
+
+  // Set canvas size only if not already set correctly (avoid clearing existing content)
+  if(canvas.width !== paper.offsetWidth || canvas.height !== paper.offsetHeight){
+    canvas.width  = paper.offsetWidth;
+    canvas.height = paper.offsetHeight;
+  }
+
   var ctx = canvas.getContext('2d');
-  var paperRect = paper.getBoundingClientRect();
-  
+
+  // Use offsetTop/offsetLeft relative to paper — works even for off-screen pages
   var pts = spans.map(function(sp){
-    var spanRect = sp.getBoundingClientRect();
-    return {
-      x: spanRect.left - paperRect.left + spanRect.width / 2,
-      y: spanRect.top  - paperRect.top  + spanRect.height / 2
-    };
+    var x = 0, y = 0;
+    var el = sp;
+    while(el && el !== paper){
+      x += el.offsetLeft;
+      y += el.offsetTop;
+      el = el.offsetParent;
+      if(el === paper) break;
+    }
+    // fallback: if offsetParent chain doesn't reach paper, use getBoundingClientRect diff
+    if(el !== paper){
+      var paperRect = paper.getBoundingClientRect();
+      var spRect    = sp.getBoundingClientRect();
+      x = spRect.left - paperRect.left;
+      y = spRect.top  - paperRect.top;
+    }
+    return { x: x + sp.offsetWidth / 2, y: y + sp.offsetHeight / 2 };
   });
   
   // Animate background highlight on spans
