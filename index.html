@@ -711,9 +711,10 @@ function redrawCanvas(canvas){
 function drawLineConnections(spans, color, lw, op, style){
   if(spans.length < 2) return;
   var paper = spans[0].closest('.paper');
+  if(!paper) return;
   var canvas = paper.querySelector('.canvas-overlay');
+  if(!canvas) return;
 
-  // Set canvas size only if not already set correctly (avoid clearing existing content)
   if(canvas.width !== paper.offsetWidth || canvas.height !== paper.offsetHeight){
     canvas.width  = paper.offsetWidth;
     canvas.height = paper.offsetHeight;
@@ -721,24 +722,20 @@ function drawLineConnections(spans, color, lw, op, style){
 
   var ctx = canvas.getContext('2d');
 
-  // Use offsetTop/offsetLeft relative to paper — works even for off-screen pages
+  // paper's position relative to track — stable even when off-screen
+  var track = document.getElementById('scroll-track');
+  var trackRect = track.getBoundingClientRect();
+  var paperRect = paper.getBoundingClientRect();
+  // paper's position relative to track (layout-stable, not viewport-dependent)
+  var paperOffsetX = paperRect.left - trackRect.left;
+  var paperOffsetY = paperRect.top  - trackRect.top;
+
   var pts = spans.map(function(sp){
-    var x = 0, y = 0;
-    var el = sp;
-    while(el && el !== paper){
-      x += el.offsetLeft;
-      y += el.offsetTop;
-      el = el.offsetParent;
-      if(el === paper) break;
-    }
-    // fallback: if offsetParent chain doesn't reach paper, use getBoundingClientRect diff
-    if(el !== paper){
-      var paperRect = paper.getBoundingClientRect();
-      var spRect    = sp.getBoundingClientRect();
-      x = spRect.left - paperRect.left;
-      y = spRect.top  - paperRect.top;
-    }
-    return { x: x + sp.offsetWidth / 2, y: y + sp.offsetHeight / 2 };
+    var r = sp.getBoundingClientRect();
+    return {
+      x: (r.left - trackRect.left) - paperOffsetX + r.width  / 2,
+      y: (r.top  - trackRect.top)  - paperOffsetY + r.height / 2
+    };
   });
   
   // Animate background highlight on spans
