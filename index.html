@@ -25,6 +25,7 @@ header{
   cursor:pointer;color:var(--ink);font-family:inherit;font-size:12px;padding:0 12px;
   transition:border-color .15s,color .15s;letter-spacing:.04em}
 .btn:hover{border-color:var(--ink);color:var(--ink)}
+.btn.active{border-color:var(--ink);background:rgba(26,20,16,.08);color:var(--ink)}
 
 /* THEME DROPDOWN */
 .theme-select-wrap{position:relative;display:inline-flex;align-items:center}
@@ -176,6 +177,15 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
   pointer-events:none;z-index:10;
 }
 
+/* DOTS OVERLAY */
+.dots-overlay{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  pointer-events:none;z-index:4;
+  opacity:0;
+  transition:opacity .4s ease;
+}
+.dots-overlay.visible{ opacity:1; }
+
 /* INSERTED IMAGE */
 .inserted-img{
   position:absolute;
@@ -229,6 +239,7 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
     </select>
   </div>
   <button class="btn" id="btn-toggle-scroll">⏸ Stop</button>
+  <button class="btn" id="btn-dots">· · Dots</button>
   <button class="btn" id="btn-clear-marks">Clear marks</button>
   <button class="btn" id="btn-export">↓ PDF</button>
 </header>
@@ -297,7 +308,7 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
       </div>
       <div class="row">
         <span>Tension</span>
-        <input type="range" id="sl-tension" min="0" max="1" step=".05" value="0.2">
+        <input type="range" id="sl-tension" min="0" max="3" step=".1" value="0.2">
         <span class="val" id="vl-tension">.2</span>
       </div>
     </div>
@@ -346,7 +357,8 @@ var currentStyle = 'ink';
 var currentColor = '#c0392b';
 var lineWidth = 1.5;
 var lineOpacity = 0.75;
-var lineTension = 0.2; // 0=straight, 1=very loose/random
+var lineTension = 0.2;
+var dotsVisible = false;
 var keywords = [];
 var allWordSpans = [];
 var paused = false;
@@ -358,6 +370,78 @@ var COLORS = [
   '#e67e22','#16a085','#2c3e50','#7f8c8d',
   '#f39c12','#1abc9c'
 ];
+
+// ── Dots overlay ──
+function drawDots(canvas){
+  var paper = canvas.parentElement;
+  if(!paper) return;
+  canvas.width  = paper.offsetWidth  || 960;
+  canvas.height = paper.offsetHeight || 1358;
+  var ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  var count = 1 + Math.floor(Math.random() * 5); // 1–5 dots
+  var placed = [];
+
+  // Use a skewed distribution: mostly small, occasionally huge
+  function randomRadius(){
+    var t = Math.random();
+    if(t < 0.4) return 3  + Math.random() * 12;   // 40% tiny: 3–15px
+    if(t < 0.7) return 15 + Math.random() * 60;   // 30% medium: 15–75px
+    return 80 + Math.random() * 180;               // 30% massive: 80–260px
+  }
+
+  var attempts = 0;
+  while(placed.length < count && attempts < 300){
+    attempts++;
+    var r = randomRadius();
+    // Allow small dots to sit anywhere, including near edge
+    var margin = Math.min(r, 20);
+    var x = margin + Math.random() * (canvas.width  - margin * 2);
+    var y = margin + Math.random() * (canvas.height - margin * 2);
+
+    // No overlap check
+    var ok = true;
+    for(var j = 0; j < placed.length; j++){
+      var dx = x - placed[j].x;
+      var dy = y - placed[j].y;
+      if(Math.sqrt(dx*dx + dy*dy) < r + placed[j].r + 15){ ok = false; break; }
+    }
+    if(!ok) continue;
+
+    placed.push({x:x, y:y, r:r});
+
+    var hue = Math.floor(Math.random() * 360);
+    var sat = 80 + Math.floor(Math.random() * 20);  // 80–100% fully saturated
+    var lit = 20 + Math.floor(Math.random() * 50);  // 20–70% — rich darks to bright
+    // Bigger dots slightly more transparent to not overwhelm
+    var op  = r > 80
+      ? 0.12 + Math.random() * 0.20   // large: 0.12–0.32
+      : 0.30 + Math.random() * 0.45;  // small: 0.30–0.75 — punchy
+
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'hsla(' + hue + ',' + sat + '%,' + lit + '%,' + op + ')';
+    ctx.fill();
+  }
+}
+
+function toggleDots(show){
+  dotsVisible = show;
+  var btn = document.getElementById('btn-dots');
+  if(btn) btn.classList.toggle('active', show);
+
+  document.querySelectorAll('.dots-overlay').forEach(function(c){
+    if(show){
+      // Ensure paper is sized before drawing
+      var paper = c.parentElement;
+      c.width  = paper.offsetWidth  || 960;
+      c.height = paper.offsetHeight || 1358;
+      drawDots(c);
+    }
+    c.classList.toggle('visible', show);
+  });
+}
 
 function init(){
   buildColorRow();
@@ -400,13 +484,18 @@ function buildPages(){
     textLayer.className = 'text-layer';
     var canvas = document.createElement('canvas');
     canvas.className = 'canvas-overlay';
+    var dotsCanvas = document.createElement('canvas');
+    dotsCanvas.className = 'dots-overlay';
     paper.appendChild(grain);
     paper.appendChild(textLayer);
+    paper.appendChild(dotsCanvas);
     paper.appendChild(canvas);
     // Append to DOM FIRST so scrollHeight is accurate during buildTextInto
     track.appendChild(paper);
     var spans = buildTextInto(textLayer, PAGE_TEXTS[idx]);
     allWordSpans = allWordSpans.concat(spans);
+    // Draw dots (hidden initially)
+    requestAnimationFrame(function(){ drawDots(dotsCanvas); });
   });
   track.style.width = (allPages.length * 1000) + 'px';
   requestAnimationFrame(function(){ resizeCanvases(); });
@@ -1254,6 +1343,9 @@ function bindEvents(){
   slTension.addEventListener('input', function(){
     lineTension = parseFloat(slTension.value);
     vlTension.textContent = lineTension.toFixed(2);
+  });
+  document.getElementById('btn-dots').addEventListener('click', function(){
+    toggleDots(!dotsVisible);
   });
   var kwin = document.getElementById('kw-input');
   kwin.addEventListener('keydown', function(e){
