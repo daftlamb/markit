@@ -620,11 +620,8 @@ function buildTextInto(layer, text){
 
     // If this paragraph pushed content past the usable area, remove it and stop
     if(layer.scrollHeight > PAPER_USABLE_H){
+      // Content fits — stop here
       layer.removeChild(el);
-      // Subtle fade at bottom
-      var fade = document.createElement('div');
-      fade.style.cssText = 'height:48px;background:linear-gradient(transparent,var(--paper));position:absolute;bottom:81px;left:0;right:0;pointer-events:none;z-index:2;';
-      layer.parentElement ? layer.parentElement.appendChild(fade) : null;
       break;
     }
   }
