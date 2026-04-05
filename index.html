@@ -26,7 +26,20 @@ header{
   transition:border-color .15s,color .15s;letter-spacing:.04em}
 .btn:hover{border-color:var(--ink);color:var(--ink)}
 
-/* LAYOUT */
+/* THEME DROPDOWN */
+.theme-select-wrap{position:relative;display:inline-flex;align-items:center}
+.theme-select{
+  height:30px;border:1px solid var(--border);background:transparent;
+  border-radius:4px;cursor:pointer;color:var(--ink);font-family:inherit;
+  font-size:12px;padding:0 28px 0 10px;letter-spacing:.04em;
+  appearance:none;-webkit-appearance:none;outline:none;
+  transition:border-color .15s;
+}
+.theme-select:hover{border-color:var(--ink)}
+.theme-select-wrap::after{
+  content:'▾';position:absolute;right:9px;pointer-events:none;
+  font-size:10px;color:var(--muted);
+}
 #layout{display:flex;flex:1;height:calc(100vh - var(--header-h));overflow:hidden}
 
 /* PANEL */
@@ -92,11 +105,11 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
 /* PAPER */
 .paper{
   position:relative;
-  width:520px;height:735px;
+  width:960px;height:1358px;
   flex-shrink:0;
   background:var(--paper);
   margin:32px 20px;
-  padding:36px 40px 44px;
+  padding:66px 75px 81px;
   background-image:
     repeating-linear-gradient(0deg, transparent, transparent 27px, rgba(180,160,120,.07) 27px, rgba(180,160,120,.07) 28px);
   overflow:hidden;
@@ -104,18 +117,35 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
 
 /* TEXT CONTENT */
 .text-layer{
-  position:relative;z-index:1;
+  position:relative;z-index:3;
   font-family:'IM Fell English','Noto Serif SC',serif;
-  line-height:1.65;
+  line-height:2.0;
   user-select:none;
-  height:100%;overflow:hidden;
+  height:100%;
+  overflow:visible;
+  /* subtle ink bleed / roughness on text */
+  filter:url(#ink-rough);
 }
 .word-span{
   display:inline;position:relative;cursor:default;
-  font-size:13.5px;
+  font-size:20px;
   transition:color .15s;
 }
 .word-space{display:inline;white-space:pre}
+
+/* PAPER GRAIN OVERLAY — sits on top of paper, below text */
+.paper-grain{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  pointer-events:none;z-index:2;
+  opacity:.28;
+  mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-size:160px 160px;
+}
+
+/* ensure text-layer and canvas are above grain */
+.text-layer{ z-index:3; }
+.canvas-overlay{ z-index:10; }
 
 /* MARK EFFECTS */
 .mark-highlight{
@@ -165,15 +195,39 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
   object-fit:contain;
   pointer-events:none;
 }
-  pointer-events:none;
-}
 </style>
 </head>
 <body>
 
+<!-- SVG filters for ink texture — hidden, referenced by CSS filter:url() -->
+<svg style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- ink-rough: subtle displacement makes text edges look hand-printed -->
+    <filter id="ink-rough" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04 0.06" numOctaves="3" seed="8" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.4" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <!-- ink-heavy: stronger for headings -->
+    <filter id="ink-heavy" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.03 0.05" numOctaves="4" seed="12" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.2" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+</svg>
+
 <header>
   <div class="brand">Mark<span>It</span> ✦</div>
   <div class="sep"></div>
+  <div class="theme-select-wrap">
+    <select class="theme-select" id="theme-select">
+      <option value="parchment">Parchment</option>
+      <option value="nightink">Night Ink</option>
+      <option value="fog">Fog</option>
+      <option value="sepia">Deep Sepia</option>
+      <option value="slate">Slate</option>
+      <option value="ecru">Écru</option>
+    </select>
+  </div>
   <button class="btn" id="btn-toggle-scroll">⏸ Stop</button>
   <button class="btn" id="btn-clear-marks">Clear marks</button>
   <button class="btn" id="btn-export">↓ PNG</button>
@@ -183,6 +237,15 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
 
   <!-- PANEL -->
   <div id="panel">
+
+    <div>
+      <div class="ps-t">Keyword</div>
+      <div id="kw-area">
+        <input type="text" id="kw-input" placeholder="type a word, press Enter…" autocomplete="off" spellcheck="false"/>
+        <div id="kw-hint">Press <strong>Enter</strong> to mark all matches.</div>
+        <div id="kw-tags"></div>
+      </div>
+    </div>
 
     <div>
       <div class="ps-t">Mark type</div>
@@ -198,12 +261,6 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
       <div class="ps-t">Insert</div>
       <button class="btn" id="btn-insert-img" style="width:100%">+ Image</button>
       <input type="file" id="file-input" accept="image/*" style="display:none">
-    </div>
-
-    <div>
-      <div class="ps-t">Apply text</div>
-      <textarea id="txt-input" placeholder="Paste text here..." style="width:100%;height:80px;padding:6px;font-size:13px;font-family:inherit;border:1px solid var(--border);border-radius:3px;resize:vertical"></textarea>
-      <button class="btn" id="btn-apply-text" style="width:100%;margin-top:6px">Apply</button>
     </div>
 
     <div>
@@ -237,12 +294,9 @@ input[type=range]{flex:1;accent-color:#c0392b;height:3px}
     </div>
 
     <div>
-      <div class="ps-t">Keyword</div>
-      <div id="kw-area">
-        <input type="text" id="kw-input" placeholder="type a word, press Enter…" autocomplete="off" spellcheck="false"/>
-        <div id="kw-hint">Press <strong>Enter</strong> to mark all matches.</div>
-        <div id="kw-tags"></div>
-      </div>
+      <div class="ps-t">Apply text</div>
+      <textarea id="txt-input" placeholder="Paste text here..." style="width:100%;height:80px;padding:6px;font-size:13px;font-family:inherit;border:1px solid var(--border);border-radius:3px;resize:vertical"></textarea>
+      <button class="btn" id="btn-apply-text" style="width:100%;margin-top:6px">Apply</button>
     </div>
 
   </div>
@@ -286,6 +340,8 @@ var lineOpacity = 0.75;
 var keywords = [];
 var allWordSpans = [];
 var paused = false;
+// Store all completed lines per canvas so they persist across redraws
+var canvasLines = new WeakMap();
 
 var COLORS = [
   '#c0392b','#2980b9','#27ae60','#8e44ad',
@@ -307,6 +363,7 @@ function buildColorRow(){
     var d = document.createElement('div');
     d.className = 'color-dot' + (c===currentColor?' active':'');
     d.style.background = c;
+    d.dataset.color = c;
     d.addEventListener('click', function(){
       currentColor = c;
       row.querySelectorAll('.color-dot').forEach(function(x){x.classList.remove('active');});
@@ -327,18 +384,22 @@ function buildPages(){
   allPages.forEach(function(idx){
     var paper = document.createElement('div');
     paper.className = 'paper';
+    var grain = document.createElement('div');
+    grain.className = 'paper-grain';
     var textLayer = document.createElement('div');
     textLayer.className = 'text-layer';
     var canvas = document.createElement('canvas');
     canvas.className = 'canvas-overlay';
-    var spans = buildTextInto(textLayer, PAGE_TEXTS[idx]);
-    allWordSpans = allWordSpans.concat(spans);
+    paper.appendChild(grain);
     paper.appendChild(textLayer);
     paper.appendChild(canvas);
+    // Append to DOM FIRST so scrollHeight is accurate during buildTextInto
     track.appendChild(paper);
+    var spans = buildTextInto(textLayer, PAGE_TEXTS[idx]);
+    allWordSpans = allWordSpans.concat(spans);
   });
-  track.style.width = (allPages.length * 560) + 'px';
-  resizeCanvases();
+  track.style.width = (allPages.length * 1000) + 'px';
+  requestAnimationFrame(function(){ resizeCanvases(); });
 }
 
 function resizeCanvases(){
@@ -354,68 +415,126 @@ function buildTextInto(layer, text){
   var spans = [];
   var paragraphs = text.split(/\n+/);
   var sizes = [13, 13.5, 12.5, 14, 13, 12];
-  paragraphs.forEach(function(para, pi){
-    if(!para.trim()) return;
-    var p = document.createElement('p');
-    p.style.marginBottom = '18px';
-    p.style.fontSize = (sizes[pi % sizes.length]) + 'px';
-    if(pi % 3 === 1) p.style.transform = 'rotate(-0.15deg)';
-    if(pi % 5 === 3) p.style.transform = 'rotate(0.1deg)';
-    
-    // Smart tokenization: split by spaces, but keep Chinese chars as individual units
-    var tokens = para.split(/(\s+)/);
+  var PAPER_USABLE_H = 1211; // 1358 - 66top - 81bottom
+
+  function appendTokens(txt, wrapEl, extraStyle){
+    var tokens = txt.split(/(\s+)/);
     tokens.forEach(function(tok){
       if(/^\s+$/.test(tok)){
         var sp = document.createElement('span');
         sp.className = 'word-space';
         sp.textContent = tok;
-        p.appendChild(sp);
+        wrapEl.appendChild(sp);
       } else {
-        // Split into Chinese chars + English words + punctuation
         var parts = tok.split(/(?=[,\.;:!?—])|(?<=[,\.;:!?—])/);
         parts.forEach(function(part){
           if(!part) return;
-          // If contains Chinese, split each char
           if(/[\u4e00-\u9fff]/.test(part)){
-            for(var i=0; i<part.length; i++){
+            for(var i=0;i<part.length;i++){
               var ch = part[i];
-              if(/[\u4e00-\u9fff]/.test(ch)){
-                var sp = document.createElement('span');
-                sp.className = 'word-span';
-                sp.textContent = ch;
-                sp.dataset.word = ch;
-                spans.push(sp);
-                p.appendChild(sp);
-              } else {
-                // Non-Chinese char in mixed string
-                var sp = document.createElement('span');
-                sp.className = 'word-span';
-                sp.textContent = ch;
-                sp.dataset.word = ch.toLowerCase();
-                spans.push(sp);
-                p.appendChild(sp);
-              }
+              var sp = document.createElement('span');
+              sp.className = 'word-span';
+              sp.textContent = ch;
+              sp.dataset.word = /[\u4e00-\u9fff]/.test(ch) ? ch : ch.toLowerCase();
+              if(extraStyle) Object.assign(sp.style, extraStyle);
+              spans.push(sp);
+              wrapEl.appendChild(sp);
             }
           } else {
-            // English word or punctuation
             var sp = document.createElement('span');
             sp.className = 'word-span';
             sp.textContent = part;
             sp.dataset.word = part.replace(/[^a-zA-Z0-9]/g,'').toLowerCase();
+            if(extraStyle) Object.assign(sp.style, extraStyle);
             spans.push(sp);
-            p.appendChild(sp);
+            wrapEl.appendChild(sp);
           }
         });
       }
     });
-    layer.appendChild(p);
-  });
+  }
+
+  for(var pi = 0; pi < paragraphs.length; pi++){
+    var para = paragraphs[pi];
+    if(!para.trim()) continue;
+
+    var headingMatch = para.match(/^(#{1,3})\s+(.*)/);
+    var blockquote   = para.match(/^>\s*(.*)/);
+    var hrLine       = para.match(/^(-{3,}|\*{3,}|_{3,})$/);
+    var listItem     = para.match(/^[-*+]\s+(.*)/);
+
+    if(hrLine){
+      var hr = document.createElement('div');
+      hr.style.cssText = 'border-top:1px solid var(--border);margin:18px 0;opacity:.5;';
+      layer.appendChild(hr);
+      if(layer.scrollHeight > PAPER_USABLE_H){ layer.removeChild(hr); break; }
+      continue;
+    }
+
+    var el = document.createElement('p');
+    el.style.marginBottom = '18px';
+    var rawText = para;
+
+    if(headingMatch){
+      var level = headingMatch[1].length;
+      rawText = headingMatch[2];
+      el.style.fontFamily = "'Special Elite', monospace";
+      el.style.fontWeight = '600';
+      el.style.fontSize   = level === 1 ? '26px' : level === 2 ? '20px' : '16px';
+      el.style.marginBottom = '10px';
+      el.style.letterSpacing = '.04em';
+    } else if(blockquote){
+      rawText = blockquote[1];
+      el.style.borderLeft  = '2px solid var(--border)';
+      el.style.paddingLeft = '12px';
+      el.style.color       = 'var(--muted)';
+      el.style.fontStyle   = 'italic';
+      el.style.fontSize    = (sizes[pi % sizes.length]) + 'px';
+    } else if(listItem){
+      rawText = listItem[1];
+      el.style.paddingLeft = '16px';
+      el.style.fontSize    = (sizes[pi % sizes.length]) + 'px';
+      var bullet = document.createElement('span');
+      bullet.textContent = '· ';
+      bullet.style.cssText = 'color:var(--muted);font-family:"Special Elite",monospace;';
+      el.appendChild(bullet);
+    } else {
+      el.style.fontSize = (sizes[pi % sizes.length]) + 'px';
+      if(pi % 3 === 1) el.style.transform = 'rotate(-0.15deg)';
+      if(pi % 5 === 3) el.style.transform = 'rotate(0.1deg)';
+    }
+
+    // Inline markdown
+    var inlineRe = /(\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`)/g;
+    var lastIndex = 0;
+    var match;
+    while((match = inlineRe.exec(rawText)) !== null){
+      if(match.index > lastIndex) appendTokens(rawText.slice(lastIndex, match.index), el, null);
+      if(match[2] !== undefined)      appendTokens(match[2], el, {fontWeight:'700'});
+      else if(match[3] !== undefined) appendTokens(match[3], el, {fontStyle:'italic'});
+      else if(match[4] !== undefined) appendTokens(match[4], el, {fontFamily:"'Special Elite',monospace", background:'rgba(0,0,0,.06)', borderRadius:'2px', padding:'0 3px'});
+      lastIndex = match.index + match[0].length;
+    }
+    if(lastIndex < rawText.length) appendTokens(rawText.slice(lastIndex), el, null);
+
+    layer.appendChild(el);
+
+    // If this paragraph pushed content past the usable area, remove it and stop
+    if(layer.scrollHeight > PAPER_USABLE_H){
+      layer.removeChild(el);
+      // Subtle fade at bottom
+      var fade = document.createElement('div');
+      fade.style.cssText = 'height:48px;background:linear-gradient(transparent,var(--paper));position:absolute;bottom:81px;left:0;right:0;pointer-events:none;z-index:2;';
+      layer.parentElement ? layer.parentElement.appendChild(fade) : null;
+      break;
+    }
+  }
   return spans;
 }
 
 function startScroll(){
   var track = document.getElementById('scroll-track');
-  var totalW = PAGE_COUNT * 560;
+  var totalW = PAGE_COUNT * 1020;
   var startTime = null;
   var offset = 0;
   function tick(ts){
@@ -490,12 +609,55 @@ function markKeyword(kw){
   var color = currentColor;
   var lw = lineWidth;
   var op = lineOpacity;
-  var word = kw.toLowerCase().trim();
+  var word = kw.trim();
   if(!word) return;
-  var matched = allWordSpans.filter(function(sp){
-    var w = sp.dataset.word;
-    return w === word || (word.length > 3 && w.includes(word)) || (w.length > 3 && word.includes(w));
-  });
+  var wordLower = word.toLowerCase();
+  
+  // For Chinese multi-char search, find consecutive matching chars
+  var isChinese = /[\u4e00-\u9fff]/.test(word);
+  var matched = [];
+  
+  if(isChinese && word.length > 1){
+    // Search for consecutive Chinese characters in same paper
+    for(var i=0; i<allWordSpans.length - word.length + 1; i++){
+      var firstSpan = allWordSpans[i];
+      var paper = firstSpan.closest('.paper');
+      var isMatch = true;
+      var tempMatched = [];
+      
+      for(var j=0; j<word.length; j++){
+        var span = allWordSpans[i+j];
+        // Check if still in same paper
+        if(!span || span.closest('.paper') !== paper){
+          isMatch = false;
+          break;
+        }
+        // Check if character matches
+        if(span.dataset.word !== word[j]){
+          isMatch = false;
+          break;
+        }
+        tempMatched.push(span);
+      }
+      
+      if(isMatch){
+        matched = matched.concat(tempMatched);
+        i += word.length - 1; // Skip matched chars
+      }
+    }
+  } else {
+    // Original logic for single char or English words
+    matched = allWordSpans.filter(function(sp){
+      var w = sp.dataset.word;
+      var wLower = w.toLowerCase();
+      return w === word || wLower === wordLower || 
+             (word.length > 3 && w.includes(word)) || 
+             (w.length > 3 && word.includes(w)) ||
+             (wordLower.length > 3 && wLower.includes(wordLower)) ||
+             (wLower.length > 3 && wordLower.includes(wLower));
+    });
+  }
+  
   if(!matched.length) return;
   if(tool === 'line'){
     groupByPaper(matched).forEach(function(group){
@@ -534,28 +696,199 @@ function applyMarkToSpan(sp, tool, color){
   }
 }
 
+function redrawCanvas(canvas){
+  var ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  var lines = canvasLines.get(canvas) || [];
+  lines.forEach(function(line){
+    if(line.style === 'ink') drawInkLine(ctx, line.pts, line.color, line.lw, line.op);
+    else if(line.style === 'brush') drawBrushLine(ctx, line.pts, line.color, line.lw, line.op);
+    else if(line.style === 'pencil') drawPencilLine(ctx, line.pts, line.color, line.lw, line.op);
+    else if(line.style === 'marker') drawMarkerLine(ctx, line.pts, line.color, line.lw, line.op);
+  });
+}
+
 function drawLineConnections(spans, color, lw, op, style){
   if(spans.length < 2) return;
   var paper = spans[0].closest('.paper');
   var canvas = paper.querySelector('.canvas-overlay');
+  canvas.width = paper.offsetWidth;
+  canvas.height = paper.offsetHeight;
   var ctx = canvas.getContext('2d');
   var paperRect = paper.getBoundingClientRect();
+  
   var pts = spans.map(function(sp){
-    var r = sp.getBoundingClientRect();
+    var spanRect = sp.getBoundingClientRect();
     return {
-      x: r.left - paperRect.left + r.width/2,
-      y: r.top - paperRect.top + r.height/2
+      x: spanRect.left - paperRect.left + spanRect.width / 2,
+      y: spanRect.top  - paperRect.top  + spanRect.height / 2
     };
   });
-  spans.forEach(function(sp){
-    sp.style.background = hexAlpha(color, 0.15);
-    sp.style.borderRadius = '2px';
-    sp.style.padding = '0 1px';
+  
+  // Animate background highlight on spans
+  spans.forEach(function(sp, idx){
+    setTimeout(function(){
+      sp.style.background = hexAlpha(color, 0.15);
+      sp.style.borderRadius = '2px';
+      sp.style.padding = '0 1px';
+      sp.style.transition = 'background 0.3s ease';
+    }, idx * 80);
   });
-  if(style === 'ink') drawInkLine(ctx, pts, color, lw, op);
-  else if(style === 'brush') drawBrushLine(ctx, pts, color, lw, op);
-  else if(style === 'pencil') drawPencilLine(ctx, pts, color, lw, op);
-  else if(style === 'marker') drawMarkerLine(ctx, pts, color, lw, op);
+  
+  // Animate new line drawing, keeping all previous lines intact
+  var duration = 800;
+  var startTime = Date.now();
+  
+  // Get or create line storage for this canvas
+  if(!canvasLines.has(canvas)) canvasLines.set(canvas, []);
+  var lines = canvasLines.get(canvas);
+  
+  function animateLine(){
+    var elapsed = Date.now() - startTime;
+    var progress = Math.min(elapsed / duration, 1);
+    
+    // Redraw all completed previous lines
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    lines.forEach(function(line){
+      if(line.style === 'ink') drawInkLine(ctx, line.pts, line.color, line.lw, line.op);
+      else if(line.style === 'brush') drawBrushLine(ctx, line.pts, line.color, line.lw, line.op);
+      else if(line.style === 'pencil') drawPencilLine(ctx, line.pts, line.color, line.lw, line.op);
+      else if(line.style === 'marker') drawMarkerLine(ctx, line.pts, line.color, line.lw, line.op);
+    });
+    
+    // Draw the new line at current progress
+    if(style === 'ink') drawInkLineAnimated(ctx, pts, color, lw, op, progress);
+    else if(style === 'brush') drawBrushLineAnimated(ctx, pts, color, lw, op, progress);
+    else if(style === 'pencil') drawPencilLineAnimated(ctx, pts, color, lw, op, progress);
+    else if(style === 'marker') drawMarkerLineAnimated(ctx, pts, color, lw, op, progress);
+    
+    if(progress < 1){
+      requestAnimationFrame(animateLine);
+    } else {
+      // Animation done — store each segment (adjacent pair) as individual line
+      // so random color can target each segment independently
+      for(var i = 0; i < pts.length - 1; i++){
+        lines.push({ pts: [pts[i], pts[i+1]], color: color, lw: lw, op: op, style: style });
+      }
+    }
+  }
+  
+  requestAnimationFrame(animateLine);
+}
+
+function drawInkLineAnimated(ctx, pts, color, lw, op, progress){
+  var totalPts = pts.length;
+  var visiblePts = Math.ceil(totalPts * progress);
+  var visiblePoints = pts.slice(0, visiblePts);
+  
+  if(visiblePoints.length < 2) return;
+  
+  ctx.globalAlpha = op;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lw;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(visiblePoints[0].x, visiblePoints[0].y);
+  
+  for(var i=0; i<visiblePoints.length-1; i++){
+    var p1 = visiblePoints[i];
+    var p2 = visiblePoints[i+1];
+    var dx = p2.x - p1.x;
+    var dy = p2.y - p1.y;
+    var cp1x = p1.x + dx * 0.25 + (Math.random()-.5)*5;
+    var cp1y = p1.y + dy * 0.25 + (Math.random()-.5)*5;
+    var cp2x = p1.x + dx * 0.75 + (Math.random()-.5)*5;
+    var cp2y = p1.y + dy * 0.75 + (Math.random()-.5)*5;
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+  }
+  ctx.stroke();
+  
+  visiblePoints.forEach(function(pt){
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, lw*2, 0, Math.PI*2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  });
+}
+
+function drawBrushLineAnimated(ctx, pts, color, lw, op, progress){
+  var totalPts = pts.length;
+  var visiblePts = Math.ceil(totalPts * progress);
+  var visiblePoints = pts.slice(0, visiblePts);
+  
+  if(visiblePoints.length < 2) return;
+  
+  var layers = 5;
+  for(var l=0;l<layers;l++){
+    ctx.globalAlpha = op / layers;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lw + Math.random()*0.8;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(visiblePoints[0].x + (Math.random()-.5)*2, visiblePoints[0].y + (Math.random()-.5)*2);
+    for(var i=1;i<visiblePoints.length;i++){
+      var p0 = visiblePoints[Math.max(0,i-1)];
+      var p1 = visiblePoints[i];
+      var jx = (Math.random()-.5)*3;
+      var jy = (Math.random()-.5)*3;
+      var cpx = (p0.x + p1.x)/2 + jx;
+      var cpy = (p0.y + p1.y)/2 + jy;
+      ctx.quadraticCurveTo(p0.x+jx, p0.y+jy, cpx, cpy);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawPencilLineAnimated(ctx, pts, color, lw, op, progress){
+  var totalPts = pts.length;
+  var visiblePts = Math.ceil(totalPts * progress);
+  var visiblePoints = pts.slice(0, visiblePts);
+  
+  if(visiblePoints.length < 2) return;
+  
+  var layers = 8;
+  for(var l=0;l<layers;l++){
+    ctx.globalAlpha = op / (layers*1.5);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lw * 0.6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(visiblePoints[0].x + (Math.random()-.5)*1.5, visiblePoints[0].y + (Math.random()-.5)*1.5);
+    for(var i=1;i<visiblePoints.length;i++){
+      var p0 = visiblePoints[Math.max(0,i-1)];
+      var p1 = visiblePoints[i];
+      var jx = (Math.random()-.5)*2;
+      var jy = (Math.random()-.5)*2;
+      var cpx = (p0.x + p1.x)/2 + jx;
+      var cpy = (p0.y + p1.y)/2 + jy;
+      ctx.quadraticCurveTo(p0.x+jx, p0.y+jy, cpx, cpy);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawMarkerLineAnimated(ctx, pts, color, lw, op, progress){
+  var totalPts = pts.length;
+  var visiblePts = Math.ceil(totalPts * progress);
+  var visiblePoints = pts.slice(0, visiblePts);
+  
+  if(visiblePoints.length < 2) return;
+  
+  ctx.globalAlpha = op * 0.6;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lw * 3;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(visiblePoints[0].x, visiblePoints[0].y);
+  for(var i=1;i<visiblePoints.length;i++){
+    ctx.lineTo(visiblePoints[i].x, visiblePoints[i].y);
+  }
+  ctx.stroke();
+  ctx.globalAlpha = 1;
 }
 
 function drawInkLine(ctx, pts, color, lw, op){
@@ -704,6 +1037,7 @@ function bindEvents(){
     document.querySelectorAll('.canvas-overlay').forEach(function(c){
       var ctx = c.getContext('2d');
       ctx.clearRect(0,0,c.width,c.height);
+      canvasLines.delete(c); // clear stored lines too
     });
     allWordSpans.forEach(function(sp){
       sp.classList.remove('mark-highlight','mark-redact','mark-strike');
@@ -734,22 +1068,121 @@ function bindEvents(){
     e.target.value = '';
   });
   
-  // Random color
+  // Random color — randomize all existing marks on canvas and spans
   document.getElementById('btn-random-color').addEventListener('click', function(){
+    // 1. Randomize currentColor and update dot UI
     var randomColor = COLORS[Math.floor(Math.random() * COLORS.length)];
     currentColor = randomColor;
     var row = document.getElementById('color-row');
     row.querySelectorAll('.color-dot').forEach(function(d){
-      d.classList.toggle('active', d.style.background === randomColor);
+      d.classList.toggle('active', d.dataset.color === randomColor);
     });
+
+    // 2. Randomize every stored line segment — each gets its own random color
+    document.querySelectorAll('.canvas-overlay').forEach(function(canvas){
+      var lines = canvasLines.get(canvas);
+      if(!lines || !lines.length) return;
+      lines.forEach(function(line){
+        line.color = COLORS[Math.floor(Math.random() * COLORS.length)];
+      });
+      redrawCanvas(canvas);
+    });
+
+    // 3. Randomize span marks (highlight / strike background/color)
+    allWordSpans.forEach(function(sp){
+      var newColor = COLORS[Math.floor(Math.random() * COLORS.length)];
+      if(sp.classList.contains('mark-highlight')){
+        sp.style.background = hexAlpha(newColor, 0.4);
+      } else if(sp.classList.contains('mark-strike')){
+        sp.style.textDecorationColor = newColor;
+      } else if(sp.style.background && sp.style.background !== ''){
+        // line-mode background highlight on spans
+        sp.style.background = hexAlpha(newColor, 0.15);
+      }
+    });
+
+    // 4. Update keyword tag colors
+    keywords.forEach(function(kw){
+      kw.color = COLORS[Math.floor(Math.random() * COLORS.length)];
+    });
+    renderTags();
   });
   
   // Apply text
   document.getElementById('btn-apply-text').addEventListener('click', function(){
     var txt = document.getElementById('txt-input').value.trim();
     if(!txt) return;
-    PAGE_TEXTS[0] = txt;
+    
+    // Save existing images before rebuilding
+    var existingImages = [];
+    var papers = document.querySelectorAll('.paper');
+    papers.forEach(function(paper){
+      var imgs = paper.querySelectorAll('.inserted-img');
+      imgs.forEach(function(img){
+        existingImages.push({
+          imageId: img.dataset.imageId,
+          cycleIndex: img.dataset.cycleIndex,
+          left: img.style.left,
+          top: img.style.top,
+          width: img.style.width,
+          height: img.style.height,
+          src: img.querySelector('img').src
+        });
+      });
+    });
+    
+    // Clear keywords
+    keywords = [];
+    renderTags();
+    
+    // Split text into PAGE_COUNT pages by paragraphs
+    var allParas = txt.split(/\n\s*\n+/).map(function(p){ return p.trim(); }).filter(Boolean);
+    if(allParas.length === 0) allParas = [txt];
+    
+    // Distribute paragraphs evenly across pages
+    PAGE_TEXTS = [];
+    var parasPerPage = Math.ceil(allParas.length / PAGE_COUNT);
+    for(var p = 0; p < PAGE_COUNT; p++){
+      var slice = allParas.slice(p * parasPerPage, (p + 1) * parasPerPage);
+      // If we've run out of paragraphs, repeat from the beginning
+      if(slice.length === 0) slice = allParas.slice(0, parasPerPage);
+      PAGE_TEXTS.push(slice.join('\n\n'));
+    }
+    
+    allWordSpans = [];
     buildPages();
+    
+    // Restore images
+    var uniqueImages = {};
+    existingImages.forEach(function(imgData){
+      if(!uniqueImages[imgData.imageId]) uniqueImages[imgData.imageId] = imgData;
+    });
+    
+    Object.values(uniqueImages).forEach(function(imgData){
+      var allPapers = document.querySelectorAll('.paper');
+      allPapers.forEach(function(paper, idx){
+        if(idx % PAGE_COUNT === parseInt(imgData.cycleIndex)){
+          var wrap = document.createElement('div');
+          wrap.className = 'inserted-img';
+          wrap.dataset.imageId = imgData.imageId;
+          wrap.dataset.cycleIndex = imgData.cycleIndex;
+          wrap.style.left = imgData.left;
+          wrap.style.top = imgData.top;
+          wrap.style.width = imgData.width;
+          wrap.style.height = imgData.height;
+          var img = document.createElement('img');
+          img.src = imgData.src;
+          wrap.appendChild(img);
+          paper.appendChild(wrap);
+          makeDraggable(wrap, imgData.imageId);
+          wrap.addEventListener('contextmenu', function(e){
+            e.preventDefault();
+            document.querySelectorAll('.inserted-img[data-image-id="' + imgData.imageId + '"]').forEach(function(im){ im.remove(); });
+          });
+        }
+      });
+    });
+    
     startScroll();
   });
 }
@@ -762,35 +1195,69 @@ function hexAlpha(hex, alpha){
 
 function insertImageIntoPaper(dataURL){
   var papers = document.querySelectorAll('.paper');
-  // Insert into the middle visible paper
-  var scrollTop = document.getElementById('canvas-wrap').scrollTop;
+  var canvasWrap = document.getElementById('canvas-wrap');
   var targetPaper = papers[0];
+  var targetIndex = 0;
+  
+  // Find the paper that's most visible in viewport
   for(var i=0; i<papers.length; i++){
     var rect = papers[i].getBoundingClientRect();
     if(rect.top < window.innerHeight/2 && rect.bottom > window.innerHeight/2){
       targetPaper = papers[i];
+      targetIndex = i;
       break;
     }
   }
-  var wrap = document.createElement('div');
-  wrap.className = 'inserted-img';
-  wrap.style.left = '50px';
-  wrap.style.top = '50px';
-  wrap.style.width = '120px';
-  wrap.style.height = '120px';
-  var img = document.createElement('img');
-  img.src = dataURL;
-  wrap.appendChild(img);
-  targetPaper.appendChild(wrap);
-  makeDraggable(wrap);
+  
+  // Calculate center position relative to the target paper
+  var paperRect = targetPaper.getBoundingClientRect();
+  var wrapRect = canvasWrap.getBoundingClientRect();
+  var centerX = (wrapRect.left + wrapRect.width/2) - paperRect.left;
+  var centerY = (wrapRect.top + wrapRect.height/2) - paperRect.top;
+  
+  // Generate unique ID for this image group
+  var imageId = 'img-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  console.log('Inserting image with ID:', imageId, 'at cycle index:', targetIndex % PAGE_COUNT);
+  
+  // Insert image into all papers at the same relative position (循环)
+  papers.forEach(function(paper, idx){
+    // Only insert into papers with same position in cycle (e.g., 0, 3, 6, 9...)
+    if(idx % PAGE_COUNT === targetIndex % PAGE_COUNT){
+      console.log('Adding image to paper', idx);
+      var wrap = document.createElement('div');
+      wrap.className = 'inserted-img';
+      wrap.dataset.imageId = imageId;
+      wrap.dataset.cycleIndex = targetIndex % PAGE_COUNT;
+      wrap.style.width = '120px';
+      wrap.style.height = '120px';
+      wrap.style.left = Math.max(0, Math.min(centerX - 60, 960 - 120)) + 'px';
+      wrap.style.top = Math.max(0, Math.min(centerY - 60, 1358 - 120)) + 'px';
+      
+      var img = document.createElement('img');
+      img.src = dataURL;
+      wrap.appendChild(img);
+      paper.appendChild(wrap);
+      makeDraggable(wrap, imageId);
+      
+      // Add right-click delete (delete from all cycle papers)
+      wrap.addEventListener('contextmenu', function(e){
+        e.preventDefault();
+        console.log('Deleting all images with ID:', imageId);
+        // Remove all images with same imageId
+        document.querySelectorAll('.inserted-img[data-image-id="' + imageId + '"]').forEach(function(im){
+          im.remove();
+        });
+      });
+    }
+  });
 }
 
-function makeDraggable(el){
+function makeDraggable(el, imageId){
   var isDragging = false;
   var startX, startY, initialLeft, initialTop;
   
   el.addEventListener('mousedown', function(e){
-    if(e.button !== 0) return; // Only left click
+    if(e.button !== 0) return;
     isDragging = true;
     startX = e.clientX;
     startY = e.clientY;
@@ -798,14 +1265,19 @@ function makeDraggable(el){
     initialTop = parseInt(el.style.top) || 0;
     el.style.cursor = 'grabbing';
     e.preventDefault();
+    e.stopPropagation(); // prevent canvas-wrap drag from firing
   });
   
   document.addEventListener('mousemove', function(e){
     if(!isDragging) return;
     var dx = e.clientX - startX;
     var dy = e.clientY - startY;
-    el.style.left = (initialLeft + dx) + 'px';
-    el.style.top = (initialTop + dy) + 'px';
+    var newLeft = (initialLeft + dx) + 'px';
+    var newTop  = (initialTop  + dy) + 'px';
+    document.querySelectorAll('.inserted-img[data-image-id="' + imageId + '"]').forEach(function(im){
+      im.style.left = newLeft;
+      im.style.top  = newTop;
+    });
   });
   
   document.addEventListener('mouseup', function(){
@@ -815,20 +1287,76 @@ function makeDraggable(el){
     }
   });
   
-  // Middle mouse wheel to scale
   el.addEventListener('wheel', function(e){
-    if(e.button === 1 || e.buttons === 4 || true){ // Always allow wheel scaling
-      e.preventDefault();
-      var currentW = parseInt(el.style.width) || 120;
-      var currentH = parseInt(el.style.height) || 120;
-      var delta = e.deltaY > 0 ? -10 : 10;
-      var newW = Math.max(30, Math.min(500, currentW + delta));
-      var newH = Math.max(30, Math.min(500, currentH + delta));
-      el.style.width = newW + 'px';
-      el.style.height = newH + 'px';
-    }
+    e.preventDefault();
+    var currentW = parseInt(el.style.width)  || 120;
+    var currentH = parseInt(el.style.height) || 120;
+    var delta = e.deltaY > 0 ? -10 : 10;
+    var newW = Math.max(30, Math.min(500, currentW + delta));
+    var newH = Math.max(30, Math.min(500, currentH + delta));
+    document.querySelectorAll('.inserted-img[data-image-id="' + imageId + '"]').forEach(function(im){
+      im.style.width  = newW + 'px';
+      im.style.height = newH + 'px';
+    });
   });
 }
+
+// ── Theme presets ──
+var THEMES = {
+  parchment: {
+    '--bg':     '#f5f0e8',
+    '--paper':  '#faf6ee',
+    '--ink':    '#1a1410',
+    '--muted':  '#7a6e60',
+    '--border': '#d8cfc0',
+  },
+  nightink: {
+    '--bg':     '#0f0e0c',
+    '--paper':  '#1a1814',
+    '--ink':    '#e8e0d0',
+    '--muted':  '#7a7060',
+    '--border': '#2e2a24',
+  },
+  fog: {
+    '--bg':     '#e8eaed',
+    '--paper':  '#f2f4f6',
+    '--ink':    '#2a2d32',
+    '--muted':  '#7a8090',
+    '--border': '#c8ccd4',
+  },
+  sepia: {
+    '--bg':     '#2c1f10',
+    '--paper':  '#3a2a18',
+    '--ink':    '#e8d8b8',
+    '--muted':  '#a08060',
+    '--border': '#4a3828',
+  },
+  slate: {
+    '--bg':     '#1e2228',
+    '--paper':  '#262c34',
+    '--ink':    '#ccd6e0',
+    '--muted':  '#6a7a88',
+    '--border': '#343c48',
+  },
+  ecru: {
+    '--bg':     '#ede8d8',
+    '--paper':  '#f7f4ec',
+    '--ink':    '#2a2218',
+    '--muted':  '#8a7e6a',
+    '--border': '#ccc4b0',
+  },
+};
+
+function applyTheme(name){
+  var t = THEMES[name];
+  if(!t) return;
+  var root = document.documentElement;
+  Object.keys(t).forEach(function(k){ root.style.setProperty(k, t[k]); });
+}
+
+document.getElementById('theme-select').addEventListener('change', function(){
+  applyTheme(this.value);
+});
 
 init();
 </script>
